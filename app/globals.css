@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+/* Abilita dark mode con strategia class-based (necessario per next-themes) */
+@variant dark (&:where(.dark, .dark *));
 
 *,
 *::before,
@@ -12,8 +15,100 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-size: 18px;
 }
 
+/* ── CSS Variables ─────────────────────────────────────────────────────────── */
+
+:root {
+  --color-bg: #fffffe;
+  --color-text: #094067;
+  --color-body: #5f6c7b;
+  --color-primary: #2273d4;
+  --color-primary-hover: #1a5bb8;
+  --color-accent: #3da9fc;
+  --color-header-border: #e5eeff;
+  --color-menu-item-border: #e5eeff;
+  --font-heading: var(--font-plus-jakarta-sans), sans-serif;
+  --font-body: var(--font-inter), sans-serif;
+}
+
+.dark {
+  --color-bg: #0f1e2d;
+  --color-text: #fffffe;
+  --color-body: #5f6c7b;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+
+html,
 body {
   min-height: 100vh;
+  background-color: var(--color-bg);
+  color: var(--color-body);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* ── Headings ──────────────────────────────────────────────────────────────── */
+
+/*
+ * Tutti gli heading usano Plus Jakarta Sans e il colore --color-text.
+ * In dark mode --color-text diventa #FFFFFE automaticamente
+ * grazie alla CSS variable definita in .dark.
+ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  color: var(--color-text);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3.111rem); /* ~56px a base 18px */
+  font-weight: 800;
+}
+
+h2 {
+  font-size: clamp(1.5rem, 4vw, 2rem); /* ~36px */
+  font-weight: 700;
+}
+
+h3 {
+  font-size: clamp(1.25rem, 3vw, 1.333rem); /* ~24px */
+  font-weight: 600;
+}
+
+h4,
+h5,
+h6 {
+  font-size: clamp(1rem, 2.5vw, 1.111rem); /* ~20px */
+  font-weight: 500;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+
+/*
+ * Stile base per tutti i button del sito.
+ * I componenti specifici (CTAButton) sovrascrivono quello che serve
+ * senza perdere questa base.
+ */
+
+button {
+  font-family: var(--font-body);
+  font-size: 1rem; /* 18px base — i componenti sovrascrivono se serve */
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
 }
