@@ -1,25 +1,22 @@
 /**
- * page.tsx — homepage del sito.
+ * app/page.tsx — Homepage
  *
- * Per ora monta solo la Hero. Nelle prossime iterazioni aggiungerò:
- * - Sezione "Servizi" (inline)
- * - Anteprima portfolio (con link al portfolio completo)
- * - Footer
- *
- * NOTA: questo è un Server Component (default in App Router). Hero.tsx ha
- * 'use client' al suo interno perché contiene WebGL e dynamic import, ma
- * la pagina che lo wrappa può rimanere server-rendered. Questo significa
- * che il primo HTML inviato al browser contiene già il markup statico
- * della pagina, mentre il JS della Hero viene idratato dopo. Best practice
- * Next.js per ottimizzare TTFB (Time To First Byte).
+ * Server Component (nessun 'use client' → di default è Server Component).
+ * HeroSection importa HeroCanvas via dynamic() con ssr:false, quindi
+ * l'intera pipeline Three.js rimane lato client senza inquinare il server.
  */
 
-import Hero from '@/components/sections/Hero'
+import HeroSection from '@/components/hero/HeroSection'
 
 export default function HomePage() {
   return (
     <main>
-      <Hero />
+      <HeroSection />
+      {/*
+       * Le sezioni successive (Servizi, Portfolio, ecc.) andranno qui.
+       * Avranno position:relative normale (non fixed/absolute come la hero),
+       * quindi si "impileranno" sotto la hero section nello scroll naturale.
+       */}
     </main>
   )
 }
