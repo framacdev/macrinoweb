@@ -96,6 +96,7 @@ export function HeroCanvasCore({
     renderer.setSize(mount.clientWidth, mount.clientHeight)
     renderer.setClearColor(0x000000, 0)
     mount.appendChild(renderer.domElement)
+    mount.style.opacity = '0'
 
     const geometry = new THREE.PlaneGeometry(
       1,
@@ -114,13 +115,17 @@ export function HeroCanvasCore({
     const texture = new THREE.TextureLoader().load(
       '/textures/ribbon3.png',
       () => {
-        requestAnimationFrame(() => fireCanvasReadyOnce())
+        // Force GPU upload so the first visible frame already has the texture.
+        renderer.initTexture(texture)
+        mount.style.opacity = '1'
+        fireCanvasReadyOnce()
       },
       undefined,
       () => {
         console.warn(
           'HeroCanvas: palette non trovata in /public/textures/ribbon3.png'
         )
+        mount.style.opacity = '1'
         fireCanvasReadyOnce()
       }
     )
@@ -414,8 +419,6 @@ export function HeroCanvasCore({
         inset: 'calc(-1 * 76px) 0 0 0',
         width: '100%',
         height: '100%',
-        backgroundColor: 'var(--color-bg)',
-        transition: 'background-color 0.3s ease',
       }}
     />
   )
