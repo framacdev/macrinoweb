@@ -5,6 +5,8 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import Header from '@/components/layout/Header'
 import LevaGate from '@/components/ui/LevaGate'
 
+// Variable fonts: Next.js loads a single .woff2 covering the full weight range.
+// Omitting `weight` opts into the variable font — no per-weight preload files.
 const inter = Inter({
   variable: '--font-inter',
   subsets: ['latin'],
@@ -12,7 +14,7 @@ const inter = Inter({
 })
 
 const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: '--font-plus-jakarta-sans',
+  variable: '--font-plus-jakarta',
   subsets: ['latin'],
   display: 'swap',
 })
@@ -30,7 +32,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="it" suppressHydrationWarning>
+    // data-scroll-behavior="smooth" tells Next.js to temporarily disable smooth
+    // scrolling during route transitions, preventing jarring UX on navigation.
+    <html lang="it" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
         suppressHydrationWarning
         className={`${inter.variable} ${plusJakartaSans.variable} antialiased min-h-screen`}

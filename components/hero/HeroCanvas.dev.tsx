@@ -1,6 +1,6 @@
 'use client'
 
-import { useControls, folder } from 'leva'
+import { useControls, folder, levaStore } from 'leva'
 import { useCallback, useEffect, useRef } from 'react'
 
 import { HERO_RIBBON_CONTROL_DEFAULTS } from '@/lib/hero/heroControlDefaults'
@@ -9,6 +9,21 @@ import { MOBILE_LANDSCAPE_PRESET } from '@/lib/hero/heroMobileLandscapePreset'
 import { HeroCanvasCore, type HeroCanvasProps } from './HeroCanvasCore'
 
 const d = HERO_RIBBON_CONTROL_DEFAULTS
+
+/**
+ * Full Leva store paths for every key touched by the mobile-landscape preset.
+ * Format: "<FolderName>.<keyName>" — mirrors exactly the folder/key names below.
+ * levaStore.getInput(path) returns undefined when Leva has disposed those paths
+ * (unmount / remount cycle), so we abort before calling setControls.
+ */
+const ML_GUARD_PATHS = [
+  'Camera & Posizione.camZ',
+  'Camera & Posizione.posX',
+  'Camera & Posizione.posY',
+  'Camera & Posizione.scale',
+  'Vignetta Blur (bordi).vignetteLeft',
+  'Vignetta Blur (bordi).vignetteBottom',
+] as const
 
 export default function HeroCanvasDev(props: HeroCanvasProps) {
   const [controls, setControls] = useControls(
@@ -350,6 +365,11 @@ export default function HeroCanvasDev(props: HeroCanvasProps) {
 
   const onMobileLandscapeMatchChange = useCallback(
     (matches: boolean) => {
+      // Abort if Leva has disposed any of the affected paths (unmount/remount cycle).
+      // levaStore.getInput returns undefined for paths not currently registered.
+      if (ML_GUARD_PATHS.some((p) => levaStore.getInput(p) === undefined))
+        return
+
       if (matches) {
         setControls({
           camZ: MOBILE_LANDSCAPE_PRESET.camZ,

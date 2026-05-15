@@ -227,7 +227,8 @@ export function HeroCanvasCore({
     )
     composer.addPass(blurPass)
 
-    const clock = new THREE.Clock()
+    const timer = new THREE.Timer()
+    timer.connect(document)
     let rafId = 0
     let heroIntersecting = true
 
@@ -245,7 +246,8 @@ export function HeroCanvasCore({
       rafId = 0
       if (!canRender()) return
 
-      const t = clock.getElapsedTime()
+      timer.update()
+      const t = timer.getElapsed()
       const c = ctrlRef.current
 
       const useHardPreset =
@@ -349,7 +351,12 @@ export function HeroCanvasCore({
 
     startLoop()
 
-    const onResize = () => {
+    // Stop the animation loop while the window is being resized to avoid
+    // rAF violations caused by the browser's GPU compositor stalling WebGL
+    // during compositing layer resize. Resume after 150ms of quiet.
+    let resizeDebounceId: ReturnType<typeof setTimeout> | null = null
+    const executeResize = () => {
+      resizeDebounceId = null
       syncMobileLandscape()
       const w = mount.clientWidth,
         h = mount.clientHeight
@@ -370,10 +377,17 @@ export function HeroCanvasCore({
       }
       ;(uniforms.u_resolution.value as THREE.Vector2).set(w, h)
       ;(blurPass.uniforms['uResolution'].value as THREE.Vector2).set(w, h)
+      startLoop()
+    }
+    const onResize = () => {
+      stopLoop()
+      if (resizeDebounceId) clearTimeout(resizeDebounceId)
+      resizeDebounceId = setTimeout(executeResize, 150)
     }
     window.addEventListener('resize', onResize)
 
     return () => {
+      if (resizeDebounceId) clearTimeout(resizeDebounceId)
       stopLoop()
       io.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
@@ -386,6 +400,8 @@ export function HeroCanvasCore({
       texture.dispose()
       msaaTarget.dispose()
       renderer.dispose()
+      timer.disconnect()
+      timer.dispose()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init una tantum; ctrlRef.current ogni frame
   }, [])

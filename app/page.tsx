@@ -11,6 +11,9 @@ import HeroSection from '@/components/hero/HeroSection'
 export default function HomePage() {
   return (
     <main>
+      {/* sr-only: testo accessibile ma invisibile — garantisce che Plus Jakarta Sans
+          venga applicato a testo reale, eliminando il warning 'preloaded but not used'. */}
+      <h1 className="sr-only">Francesco Macrino — Web Developer</h1>
       <HeroSection />
       {/*
        * Le sezioni successive (Servizi, Portfolio, ecc.) andranno qui.
