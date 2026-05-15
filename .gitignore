@@ -44,5 +44,6 @@ next-env.d.ts
 
 # textures
 /public/textures
+!/public/textures/ribbon3.png
 
 .vercel
