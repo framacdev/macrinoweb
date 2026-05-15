@@ -1,62 +1,118 @@
 'use client'
 
 /**
- * HeroSection — wrapper della Hero Section
- *
- * Perché dynamic() con ssr:false?
- *
- * Three.js usa window, document e WebGL API che non esistono sul server
- * (Node.js). Next.js con App Router esegue il codice sia sul server (SSR)
- * che sul client. Se importassi HeroCanvas direttamente, il server
- * crasherebbe tentando di accedere a window.
- *
- * dynamic() con ssr:false dice a Next.js: "questo componente esiste
- * SOLO sul client, non provare a renderizzarlo sul server".
- *
- * Il loading:() => null evita flash di contenuto non stilizzato (FOUC):
- * mentre il bundle Three.js si carica (è pesante), non mostriamo nulla,
- * solo il background CSS del parent che è già corretto.
+ * HeroSection — poster da costanti statiche (`lib/hero/heroPosterSources.ts`).
+ * HeroCanvas: `HeroCanvas.tsx` (dynamic, ssr: false).
  */
 
-import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-const HeroCanvas = dynamic(() => import('./HeroCanvas'), {
-  ssr: false,
-  loading: () => null,
-})
+import {
+  HERO_CANVAS_POSTER_WIDTHS,
+  HERO_POSTER_DESKTOP_PNG,
+  HERO_POSTER_DESKTOP_WEBP,
+  HERO_POSTER_MOBILE_PNG,
+  HERO_POSTER_MOBILE_TOUCH_WEBP_SRCSET,
+} from '@/lib/hero/heroPosterSources'
+import { hasWebGL } from '@/lib/hero/hasWebGL'
+
+import HeroCanvas from './HeroCanvas'
+
+const HERO_MOUNT_INSET = 'calc(-1 * 76px) 0 0 0' as const
+
+const MOBILE_TOUCH_MEDIA = '(max-width: 1024px) and (pointer: coarse)' as const
 
 export default function HeroSection() {
+  const [posterHidden, setPosterHidden] = useState(false)
+  const [showPoster, setShowPoster] = useState(true)
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      setWebglSupported(hasWebGL())
+    })
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  const onCanvasReady = useCallback(() => {
+    setPosterHidden(true)
+  }, [])
+
+  const imgHintSize = useMemo(() => {
+    const w = Math.max(...HERO_CANVAS_POSTER_WIDTHS)
+    return { w, h: Math.round((w * 9) / 16) }
+  }, [])
+
   return (
-    /*
-     * position:relative + overflow:hidden sono obbligatori:
-     * - relative: crea il "containing block" per il figlio position:absolute
-     *   (il mountRef div dentro HeroCanvas). Senza di esso, il canvas
-     *   si posizionerebbe rispetto al viewport o all'elemento positioned
-     *   più vicino nell'albero DOM.
-     * - overflow:hidden: impedisce che l'onda/torsione del ribbon esca
-     *   oltre i bordi della sezione hero creando scrollbar indesiderate.
-     *
-     * backgroundColor:var(--color-bg) gestisce il colore di sfondo sia
-     * in light che in dark mode (il CSS variable cambia automaticamente
-     * grazie a ThemeProvider + class-based dark mode). Il canvas Three.js
-     * ha alpha:true e renderizza sopra questo colore.
-     *
-     * 100dvh (dynamic viewport height): unità moderna che esclude la
-     * barra degli indirizzi del browser mobile dal calcolo dell'altezza.
-     * Usare 100vh su mobile causa problemi di overflow quando la barra
-     * degli indirizzi è visibile (occupa spazio ma non è inclusa in 100vh).
-     */
     <section
       style={{
         position: 'relative',
         width: '100%',
         height: '100dvh',
-        overflow: 'hidden',
+        overflow: 'visible',
         backgroundColor: 'var(--color-bg)',
-        transition: 'background-color 0.3s ease', // sync con Header.tsx
+        transition: 'background-color 0.3s ease',
       }}
     >
-      <HeroCanvas />
+      {showPoster ? (
+        <picture
+          style={{
+            position: 'absolute',
+            inset: HERO_MOUNT_INSET,
+            width: '100%',
+            height: '100%',
+            zIndex: 0,
+            pointerEvents: 'none',
+            opacity: posterHidden ? 0 : 1,
+            transition: 'opacity 0.55s ease',
+          }}
+        >
+          <source
+            type="image/webp"
+            media={MOBILE_TOUCH_MEDIA}
+            srcSet={HERO_POSTER_MOBILE_TOUCH_WEBP_SRCSET}
+            sizes="100vw"
+          />
+          <source
+            type="image/png"
+            media={MOBILE_TOUCH_MEDIA}
+            srcSet={`${HERO_POSTER_MOBILE_PNG} 1x`}
+          />
+          <source
+            type="image/webp"
+            media="(min-width: 1025px)"
+            srcSet={`${HERO_POSTER_DESKTOP_WEBP} 1x`}
+          />
+          <img
+            src={HERO_POSTER_DESKTOP_PNG}
+            alt=""
+            width={imgHintSize.w}
+            height={imgHintSize.h}
+            decoding="async"
+            fetchPriority="high"
+            sizes="100vw"
+            onError={() => setShowPoster(false)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: '50% 40%',
+            }}
+          />
+        </picture>
+      ) : null}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          height: '100%',
+        }}
+      >
+        {webglSupported === true ? (
+          <HeroCanvas onCanvasReady={onCanvasReady} />
+        ) : null}
+      </div>
     </section>
   )
 }

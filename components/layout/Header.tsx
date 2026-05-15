@@ -117,9 +117,9 @@ function CTAButton({ onClick }: { onClick?: () => void }) {
     <Link
       href="/contatti"
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onPointerDown={() => setIsHovered(true)}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+      onPointerCancel={() => setIsHovered(false)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -337,6 +337,8 @@ function MobileMenu({
 }) {
   const textColor = isDark ? C.textDark : C.text
   const [isPressed, setIsPressed] = useState(false)
+  const [isHoveringMobileNav, setIsHoveringMobileNav] = useState(false)
+  const [mobileHoveredNav, setMobileHoveredNav] = useState<string | null>(null)
 
   /*
    * Calcolo dell'altezza dello switch quadrato per matchare la CTA.
@@ -383,13 +385,26 @@ function MobileMenu({
           justifyContent: 'space-between',
         }}
       >
-        {/* Voci di menu */}
-        <div>
+        {/* Voci di menu — stesso effetto "onda" della nav desktop (pointer / tap) */}
+        <div
+          onPointerEnter={() => setIsHoveringMobileNav(true)}
+          onPointerLeave={() => {
+            setIsHoveringMobileNav(false)
+            setMobileHoveredNav(null)
+          }}
+          onPointerCancel={() => {
+            setIsHoveringMobileNav(false)
+            setMobileHoveredNav(null)
+          }}
+        >
           {NAV_ITEMS.map((item, index) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={onClose}
+              onPointerEnter={() => setMobileHoveredNav(item.href)}
+              onPointerLeave={() => setMobileHoveredNav(null)}
+              onPointerCancel={() => setMobileHoveredNav(null)}
               style={{
                 display: 'block',
                 padding: '20px 16px',
@@ -399,6 +414,11 @@ function MobileMenu({
                 fontWeight: '500',
                 letterSpacing: '-0.02em',
                 textDecoration: 'none',
+                opacity:
+                  isHoveringMobileNav && mobileHoveredNav !== item.href
+                    ? 0.5
+                    : 1,
+                transition: 'opacity 0.3s ease-in-out, color 0.3s ease-in-out',
                 // border-top sempre, border-bottom solo sull'ultimo
                 borderTop: `1px solid ${
                   isDark ? 'rgba(229, 238, 255, 0.04)' : C.menuBorder
@@ -504,7 +524,7 @@ export default function Header() {
   const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    setMounted(true)
+    const mountId = window.requestAnimationFrame(() => setMounted(true))
 
     const measureHeader = () => {
       if (headerRef.current) {
@@ -531,6 +551,7 @@ export default function Header() {
     window.addEventListener('scroll', handleScroll, { passive: true })
 
     return () => {
+      cancelAnimationFrame(mountId)
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('scroll', handleScroll)
     }
@@ -608,17 +629,15 @@ export default function Header() {
         ref={headerRef}
         className="sticky top-0 z-50 w-full"
         style={{
-          // In light mode non-floating: bianco con border-bottom
-          // In dark mode non-floating: dark navy
-          // In floating: trasparente (il blur è sulla card interna)
-          backgroundColor: !isFloating ? 'var(--color-bg)' : 'transparent',
+          // Sfondo sempre trasparente (il canvas / la hero forniscono il colore)
+          background: 'transparent',
           borderBottom:
             !isFloating && !isMobile
               ? `1px solid ${
                   isDark ? 'rgba(229, 238, 255, 0.1)' : C.headerBorder
                 }`
               : 'none',
-          transition: 'background-color 0.3s ease, border-color 0.3s ease',
+          transition: 'border-color 0.3s ease',
         }}
       >
         {/* Container max-width — "il container dell'header" */}
@@ -655,8 +674,12 @@ export default function Header() {
               {/* Nav desktop — nascosta su mobile (lg:flex) */}
               <nav
                 className="hidden lg:flex items-center"
-                onMouseEnter={() => setIsHoveringNav(true)}
-                onMouseLeave={() => {
+                onPointerEnter={() => setIsHoveringNav(true)}
+                onPointerLeave={() => {
+                  setIsHoveringNav(false)
+                  setHoveredNav(null)
+                }}
+                onPointerCancel={() => {
                   setIsHoveringNav(false)
                   setHoveredNav(null)
                 }}
@@ -665,11 +688,12 @@ export default function Header() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onMouseEnter={() => setHoveredNav(item.href)}
-                    onMouseLeave={() => setHoveredNav(null)}
+                    onPointerEnter={() => setHoveredNav(item.href)}
+                    onPointerLeave={() => setHoveredNav(null)}
+                    onPointerCancel={() => setHoveredNav(null)}
                     style={{
                       color: textColor,
-                      // Effetto Stripe: gli altri link vanno a 0.5 opacity
+                      // Effetto onda: gli altri link vanno a 0.5 opacity
                       // quando ne stai hovering uno
                       opacity:
                         isHoveringNav && hoveredNav !== item.href ? 0.5 : 1,
@@ -709,10 +733,13 @@ export default function Header() {
                   color: textColor,
                   transition: 'color 0.3s ease-in-out',
                 }}
-                onMouseEnter={(e) => {
+                onPointerEnter={(e) => {
                   e.currentTarget.style.color = C.accent
                 }}
-                onMouseLeave={(e) => {
+                onPointerLeave={(e) => {
+                  e.currentTarget.style.color = textColor
+                }}
+                onPointerCancel={(e) => {
                   e.currentTarget.style.color = textColor
                 }}
               >

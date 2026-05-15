@@ -3,7 +3,7 @@ import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import Header from '@/components/layout/Header'
-import LevaPanel from '@/components/ui/LevaPanel'
+import LevaGate from '@/components/ui/LevaGate'
 
 const inter = Inter({
   variable: '--font-inter',
@@ -36,7 +36,7 @@ export default function RootLayout({
         className={`${inter.variable} ${plusJakartaSans.variable} antialiased min-h-screen`}
       >
         <ThemeProvider>
-          <LevaPanel />
+          <LevaGate />
           <Header />
           {children}
         </ThemeProvider>

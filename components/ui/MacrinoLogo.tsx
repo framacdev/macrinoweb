@@ -44,8 +44,9 @@ export default function MacrinoLogo() {
       viewBox="0 0 126 18"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onPointerEnter={() => setIsHovered(true)}
+      onPointerLeave={() => setIsHovered(false)}
+      onPointerCancel={() => setIsHovered(false)}
       style={{ cursor: 'pointer', display: 'block' }}
       aria-label="MacrinoWeb logo"
     >

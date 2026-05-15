@@ -2,8 +2,8 @@
  * app/page.tsx — Homepage
  *
  * Server Component (nessun 'use client' → di default è Server Component).
- * HeroSection importa HeroCanvas via dynamic() con ssr:false, quindi
- * l'intera pipeline Three.js rimane lato client senza inquinare il server.
+ * HeroSection orchestra poster + gate WebGL; HeroCanvas è dynamic ssr:false
+ * nel modulo `HeroCanvas.tsx` così Three resta solo client.
  */
 
 import HeroSection from '@/components/hero/HeroSection'
