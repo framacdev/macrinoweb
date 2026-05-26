@@ -22,8 +22,6 @@ import { hasWebGL } from '@/lib/hero/hasWebGL'
 
 import HeroCanvas from './HeroCanvas'
 
-const HERO_MOUNT_INSET = 'calc(-1 * 76px) 0 0 0' as const
-
 // WHY: riusa MOBILE_LANDSCAPE_MQ già definita in heroMobileLandscapePreset
 // anziché duplicare la stringa. La virgola CSS (OR) combina i due casi:
 // phone portrait 576–767px  OU  phone landscape con pointer coarse ≤ 1024px.
@@ -33,6 +31,10 @@ export default function HeroSection() {
   const [posterHidden, setPosterHidden] = useState(false)
   const [showPoster, setShowPoster] = useState(true)
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null)
+  // WHY: initial value = 76px — SSR-safe (nessun accesso a window, nessun
+  // hydration mismatch). Il useEffect corregge a 64px su viewport ≤ 1024px
+  // dopo la hydration, replicando lo stesso breakpoint di HeroCanvasCore.
+  const [posterInset, setPosterInset] = useState('calc(-1 * 76px) 0 0 0')
   // WHY: undefined = pre-hydration (SSR usa '100dvh'). Dopo il primo RAF
   // viene fissato a window.innerHeight px e non cambia mai più, replicando
   // il comportamento di Stripe (hero height fissa, immune a resize verticale
@@ -73,6 +75,17 @@ export default function HeroSection() {
     return () => window.removeEventListener('orientationchange', updateHeight)
   }, [])
 
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1024px)')
+    const update = () =>
+      setPosterInset(
+        mq.matches ? 'calc(-1 * 64px) 0 0 0' : 'calc(-1 * 76px) 0 0 0'
+      )
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   const onCanvasReady = useCallback(() => {
     setPosterHidden(true)
   }, [])
@@ -94,7 +107,7 @@ export default function HeroSection() {
         <picture
           style={{
             position: 'absolute',
-            inset: HERO_MOUNT_INSET,
+            inset: posterInset,
             width: '100%',
             height: '100%',
             zIndex: 0,
