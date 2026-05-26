@@ -5,7 +5,7 @@
  * I controlli arrivano da `ctrlRef` (Leva in dev, valori statici in prod).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
@@ -34,12 +34,6 @@ import {
 // trecento righe di setup WebGL.
 const MIN_CANVAS_W = 768 as const
 
-// WHY: la navbar ha altezza 76px su desktop e 64px su mobile/tablet (≤ 1024px).
-// Il mount div deve sforare esattamente dell'altezza della navbar per andare
-// dietro di essa — i due valori di inset corrispondono a queste due altezze.
-const INSET_DESKTOP = 'calc(-1 * 76px) 0 0 0' as const
-const INSET_MOBILE = 'calc(-1 * 64px) 0 0 0' as const
-const NARROW_NAV_MQ = '(max-width: 1024px)' as const
 
 /**
  * Risolve la priority chain dei preset responsivi in produzione.
@@ -91,26 +85,6 @@ export function HeroCanvasCore({
   onMobilePortraitMatchChange,
   onTabletMatchChange,
 }: HeroCanvasCoreProps) {
-  // WHY: lazy initializer — il componente è ssr:false, quindi window è sempre
-  // disponibile al primo render. Evita il flash da INSET_DESKTOP → INSET_MOBILE
-  // su viewport stretti prima che il useEffect si esegua.
-  const [mountInset, setMountInset] = useState<string>(() =>
-    window.matchMedia(NARROW_NAV_MQ).matches ? INSET_MOBILE : INSET_DESKTOP
-  )
-
-  useEffect(() => {
-    const mq = window.matchMedia(NARROW_NAV_MQ)
-    const update = () => {
-      setMountInset(mq.matches ? INSET_MOBILE : INSET_DESKTOP)
-      // WHY: il cambio di inset modifica mount.clientHeight (il bleed dietro la
-      // navbar cambia di 12px) — il synthetic resize event attiva il debounce
-      // di executeResize affinché renderer e composer si adattino alla nuova altezza.
-      window.dispatchEvent(new Event('resize'))
-    }
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [])
-
   const mountRef = useRef<HTMLDivElement>(null)
   const isMobileLandscapeRef = useRef(false)
   const isMobilePortraitRef = useRef(false)
@@ -606,10 +580,10 @@ export function HeroCanvasCore({
       ref={mountRef}
       style={{
         position: 'absolute',
-        // WHY: mountInset varia con la larghezza del viewport —
-        // 76px su desktop (> 1024px) e 64px su mobile/tablet (≤ 1024px),
-        // corrispondendo all'altezza della navbar nei due casi.
-        inset: mountInset,
+        // WHY: usa la CSS custom property --hero-nav-h (definita in globals.css
+        // con media query) — il valore è corretto fin dal primo render SSR,
+        // senza flash post-hydration. 76px desktop, 64px mobile/tablet (≤ 1024px).
+        inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
         width: '100%',
         height: '100%',
         // WHY: overflow:hidden clippa il canvas (renderizzato a min 768px)
