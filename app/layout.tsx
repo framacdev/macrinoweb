@@ -19,11 +19,47 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   display: 'swap',
 })
 
+const SITE_URL = 'https://macrinoweb.com'
+const SITE_TITLE = 'Francesco Macrino — Web Developer'
+const SITE_DESCRIPTION =
+  'Web Developer con focus su qualità, performance e risultati concreti. Trasformo idee e problemi complessi in soluzioni digitali efficaci.'
+
 export const metadata: Metadata = {
-  title: 'Francesco Macrino — Web Developer',
-  description:
-    'Web Developer con focus su qualità, performance e risultati concreti. Trasformo idee e problemi complessi in soluzioni digitali efficaci.',
-  metadataBase: new URL('https://macrinoweb.com'),
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: 'website',
+    locale: 'it_IT',
+    url: SITE_URL,
+    siteName: 'Francesco Macrino',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    // WHY: /og-image.png va generato e aggiunto in /public/ separatamente.
+    // Le dimensioni 1200×630 sono lo standard consigliato da LinkedIn e Facebook.
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: SITE_TITLE,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ['/og-image.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
 }
 
 export default function RootLayout({

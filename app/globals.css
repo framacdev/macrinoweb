@@ -37,6 +37,11 @@ html {
   --color-bg: #0f1e2d;
   --color-text: #fffffe;
   --color-body: #5f6c7b;
+  /* WHY: in light mode i border usano #E5EEFF (celeste chiaro) che su fondo
+     scuro sarebbe quasi invisibile. Le versioni semi-trasparenti mantengono
+     la stessa tinta ma si adattano al fondo dark senza introdurre nuovi colori. */
+  --color-header-border: rgba(229, 238, 255, 0.08);
+  --color-menu-item-border: rgba(229, 238, 255, 0.04);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */

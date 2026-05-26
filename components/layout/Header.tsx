@@ -23,6 +23,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from 'next-themes'
+import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Sun, Moon } from 'lucide-react'
 import MacrinoLogo from '@/components/ui/MacrinoLogo'
@@ -336,6 +337,7 @@ function MobileMenu({
   mounted: boolean
 }) {
   const textColor = isDark ? C.textDark : C.text
+  const pathname = usePathname()
   const [isPressed, setIsPressed] = useState(false)
   const [isHoveringMobileNav, setIsHoveringMobileNav] = useState(false)
   const [mobileHoveredNav, setMobileHoveredNav] = useState<string | null>(null)
@@ -386,7 +388,8 @@ function MobileMenu({
         }}
       >
         {/* Voci di menu — stesso effetto "onda" della nav desktop (pointer / tap) */}
-        <div
+        <nav
+          aria-label="Menu di navigazione"
           onPointerEnter={() => setIsHoveringMobileNav(true)}
           onPointerLeave={() => {
             setIsHoveringMobileNav(false)
@@ -401,6 +404,7 @@ function MobileMenu({
             <Link
               key={item.href}
               href={item.href}
+              aria-current={pathname === item.href ? 'page' : undefined}
               onClick={onClose}
               onPointerEnter={() => setMobileHoveredNav(item.href)}
               onPointerLeave={() => setMobileHoveredNav(null)}
@@ -434,7 +438,7 @@ function MobileMenu({
               {item.label}
             </Link>
           ))}
-        </div>
+        </nav>
 
         {/*
          * Sezione inferiore: CTA Contattami (sinistra) + switch tema (destra).
@@ -521,6 +525,9 @@ export default function Header() {
   const [mounted, setMounted] = useState(false)
   const [headerHeight, setHeaderHeight] = useState(60)
   const { theme, setTheme } = useTheme()
+  // WHY: pathname per aria-current="page" sui link di navigazione —
+  // indica agli screen reader qual è la pagina attiva corrente (WCAG 2.1).
+  const pathname = usePathname()
   const headerRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -673,6 +680,7 @@ export default function Header() {
 
               {/* Nav desktop — nascosta su mobile (lg:flex) */}
               <nav
+                aria-label="Navigazione principale"
                 className="hidden lg:flex items-center"
                 onPointerEnter={() => setIsHoveringNav(true)}
                 onPointerLeave={() => {
@@ -688,6 +696,7 @@ export default function Header() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={pathname === item.href ? 'page' : undefined}
                     onPointerEnter={() => setHoveredNav(item.href)}
                     onPointerLeave={() => setHoveredNav(null)}
                     onPointerCancel={() => setHoveredNav(null)}

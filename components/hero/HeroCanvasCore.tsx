@@ -12,17 +12,57 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 
+// WHY: estende Window con le tre sentinelle usate dalla pagina /capture-poster
+// per comunicare con il render loop WebGL senza prop drilling né ref esterni.
+declare global {
+  interface Window {
+    __heroCanvasReady?: boolean
+    __heroCaptureRequested?: boolean
+    __heroCaptureData?: string
+  }
+}
+
 import type { HeroRibbonControls } from '@/lib/hero/heroControlDefaults'
 import {
   MOBILE_LANDSCAPE_MQ,
   MOBILE_LANDSCAPE_PRESET,
 } from '@/lib/hero/heroMobileLandscapePreset'
+import {
+  MOBILE_PORTRAIT_MQ,
+  MOBILE_PORTRAIT_PRESET,
+} from '@/lib/hero/heroMobilePortraitPreset'
+import { TABLET_MQ, TABLET_PRESET } from '@/lib/hero/heroTabletPreset'
 import { resolveHeroCanvasQuality } from '@/lib/hero/heroCanvasQuality'
 import { heroRibbonRadialBlurShader } from '@/lib/hero/heroRibbonRadialBlur'
 import {
   heroRibbonFragmentShader,
   heroRibbonVertexShader,
 } from '@/lib/hero/heroRibbonShaders'
+
+// WHY: costante di design (minimo supportato) — a module scope anziché nel
+// closure del useEffect, così è visibile e documentata senza dover leggere
+// trecento righe di setup WebGL.
+const MIN_CANVAS_W = 768 as const
+
+/**
+ * Risolve la priority chain dei preset responsivi in produzione.
+ * Unica fonte di verità: evita di replicare la stessa logica condizionale
+ * sia nell'inizializzazione della scena che dentro `tick()`.
+ *
+ * Priority: mobile landscape > mobile portrait > tablet > default.
+ * In dev tutti i flag tornano `false` — i valori arrivano da Leva.
+ */
+function resolvePresetFlags(
+  isMobileLandscape: boolean,
+  isMobilePortrait: boolean,
+  isTablet: boolean
+) {
+  const isProd = process.env.NODE_ENV === 'production'
+  const useLandscape = isProd && isMobileLandscape
+  const usePortrait = isProd && !useLandscape && isMobilePortrait
+  const useTablet = isProd && !useLandscape && !usePortrait && isTablet
+  return { useLandscape, usePortrait, useTablet }
+}
 
 export type HeroCanvasProps = {
   onCanvasReady?: () => void
@@ -35,23 +75,45 @@ export type HeroCanvasCoreProps = HeroCanvasProps & {
    * In dev: usare per allineare Leva al preset senza bloccare gli slider dopo.
    */
   onMobileLandscapeMatchChange?: (matches: boolean) => void
+  /**
+   * Chiamato quando cambia `matches` della media query mobile portrait (< 576px).
+   * In dev: usare per allineare Leva al preset senza bloccare gli slider dopo.
+   */
+  onMobilePortraitMatchChange?: (matches: boolean) => void
+  /**
+   * Chiamato quando cambia `matches` della media query tablet (768px–1024px).
+   * In dev: usare per allineare Leva al preset tablet senza bloccare gli slider dopo.
+   */
+  onTabletMatchChange?: (matches: boolean) => void
 }
 
 export function HeroCanvasCore({
   ctrlRef,
   onCanvasReady,
   onMobileLandscapeMatchChange,
+  onMobilePortraitMatchChange,
+  onTabletMatchChange,
 }: HeroCanvasCoreProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const isMobileLandscapeRef = useRef(false)
+  const isMobilePortraitRef = useRef(false)
+  const isTabletRef = useRef(false)
   const onCanvasReadyRef = useRef(onCanvasReady)
   const onMlRef = useRef(onMobileLandscapeMatchChange)
+  const onMobilePortraitRef = useRef(onMobilePortraitMatchChange)
+  const onTabletRef = useRef(onTabletMatchChange)
   useEffect(() => {
     onCanvasReadyRef.current = onCanvasReady
   }, [onCanvasReady])
   useEffect(() => {
     onMlRef.current = onMobileLandscapeMatchChange
   }, [onMobileLandscapeMatchChange])
+  useEffect(() => {
+    onMobilePortraitRef.current = onMobilePortraitMatchChange
+  }, [onMobilePortraitMatchChange])
+  useEffect(() => {
+    onTabletRef.current = onTabletMatchChange
+  }, [onTabletMatchChange])
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -70,18 +132,71 @@ export function HeroCanvasCore({
     syncMobileLandscape()
     mq.addEventListener('change', syncMobileLandscape)
 
+    // WHY: MQ mobile portrait — attiva il preset < 576px in prod e notifica
+    // HeroCanvas.dev in dev affinché aggiorni Leva (camFov + posX).
+    // Priorità: inferiore a mobile landscape, superiore a tablet.
+    const portraitMq = window.matchMedia(MOBILE_PORTRAIT_MQ)
+    let prevPortraitMatches: boolean | undefined
+    const syncMobilePortrait = () => {
+      const next = portraitMq.matches
+      isMobilePortraitRef.current = next
+      if (prevPortraitMatches !== next) {
+        prevPortraitMatches = next
+        onMobilePortraitRef.current?.(next)
+      }
+    }
+    syncMobilePortrait()
+    portraitMq.addEventListener('change', syncMobilePortrait)
+
+    // WHY: MQ tablet — attiva il preset 768px–1024px in prod e notifica
+    // HeroCanvas.dev in dev affinché aggiorni Leva tramite setControls.
+    // Il callback segue lo stesso pattern di syncMobileLandscape: scatta
+    // anche al mount (prevTabletMatches undefined) per seed immediato di Leva.
+    const tabletMq = window.matchMedia(TABLET_MQ)
+    let prevTabletMatches: boolean | undefined
+    const syncTablet = () => {
+      const next = tabletMq.matches
+      isTabletRef.current = next
+      if (prevTabletMatches !== next) {
+        prevTabletMatches = next
+        onTabletRef.current?.(next)
+      }
+    }
+    syncTablet()
+    tabletMq.addEventListener('change', syncTablet)
+
     const quality = resolveHeroCanvasQuality()
+
+    // WHY: la larghezza minima è imposta in JS, NON via CSS min-width.
+    // Un min-width CSS su un elemento position:absolute espande il document
+    // width, causando horizontal scroll e il browser auto-zoom su viewport
+    // stretti. Con initW clampato in JS il DOM rimane invariato; il clipping
+    // è gestito da overflow:hidden sul mount div stesso (vedi return JSX).
+    const initW = Math.max(mount.clientWidth, MIN_CANVAS_W)
 
     const scene = new THREE.Scene()
 
+    // WHY: resolvePresetFlags centralizza la priority chain — stesso helper
+    // usato sotto in tick() per evitare duplicazione e divergenza.
+    const {
+      useLandscape: hardPresetInit,
+      usePortrait: useMobilePortraitPresetInit,
+      useTablet: useTabletPresetInit,
+    } = resolvePresetFlags(
+      isMobileLandscapeRef.current,
+      isMobilePortraitRef.current,
+      isTabletRef.current
+    )
     const camera = new THREE.PerspectiveCamera(
-      ctrlRef.current.camFov,
-      mount.clientWidth / mount.clientHeight,
+      useMobilePortraitPresetInit
+        ? MOBILE_PORTRAIT_PRESET.camFov
+        : useTabletPresetInit
+          ? TABLET_PRESET.camFov
+          : ctrlRef.current.camFov,
+      initW / mount.clientHeight,
       0.1,
       100
     )
-    const hardPresetInit =
-      process.env.NODE_ENV === 'production' && isMobileLandscapeRef.current
     camera.position.z = hardPresetInit
       ? MOBILE_LANDSCAPE_PRESET.camZ
       : ctrlRef.current.camZ
@@ -93,7 +208,7 @@ export function HeroCanvasCore({
     })
     const pixelRatio = Math.min(window.devicePixelRatio, quality.pixelRatioCap)
     renderer.setPixelRatio(pixelRatio)
-    renderer.setSize(mount.clientWidth, mount.clientHeight)
+    renderer.setSize(initW, mount.clientHeight)
     renderer.setClearColor(0x000000, 0)
     mount.appendChild(renderer.domElement)
     mount.style.opacity = '0'
@@ -119,6 +234,7 @@ export function HeroCanvasCore({
         renderer.initTexture(texture)
         mount.style.opacity = '1'
         fireCanvasReadyOnce()
+        if (typeof window !== 'undefined') window.__heroCanvasReady = true
       },
       undefined,
       () => {
@@ -140,7 +256,7 @@ export function HeroCanvasCore({
       u_time: { value: 0 },
       u_speed: { value: c0.speed },
       u_resolution: {
-        value: new THREE.Vector2(mount.clientWidth, mount.clientHeight),
+        value: new THREE.Vector2(initW, mount.clientHeight),
       },
 
       u_paletteTexture: { value: texture },
@@ -200,14 +316,30 @@ export function HeroCanvasCore({
     ribbon.rotation.z = c0.rotZ
     const mlInit = hardPresetInit
     ribbon.position.set(
-      mlInit ? MOBILE_LANDSCAPE_PRESET.posX : c0.posX,
-      mlInit ? MOBILE_LANDSCAPE_PRESET.posY : c0.posY,
+      mlInit
+        ? MOBILE_LANDSCAPE_PRESET.posX
+        : useMobilePortraitPresetInit
+          ? MOBILE_PORTRAIT_PRESET.posX
+          : useTabletPresetInit
+            ? TABLET_PRESET.posX
+            : c0.posX,
+      mlInit
+        ? MOBILE_LANDSCAPE_PRESET.posY
+        : useTabletPresetInit
+          ? TABLET_PRESET.posY
+          : c0.posY,
       0
     )
-    ribbon.scale.setScalar(mlInit ? MOBILE_LANDSCAPE_PRESET.scale : c0.scale)
+    ribbon.scale.setScalar(
+      mlInit
+        ? MOBILE_LANDSCAPE_PRESET.scale
+        : useTabletPresetInit
+          ? TABLET_PRESET.scale
+          : c0.scale
+    )
     scene.add(ribbon)
 
-    const wPx = Math.floor(mount.clientWidth * pixelRatio)
+    const wPx = Math.floor(initW * pixelRatio)
     const hPx = Math.floor(mount.clientHeight * pixelRatio)
     const msaaTarget = new THREE.WebGLRenderTarget(wPx, hPx, {
       samples: quality.msaaSamples,
@@ -227,7 +359,7 @@ export function HeroCanvasCore({
 
     const blurPass = new ShaderPass(heroRibbonRadialBlurShader)
     ;(blurPass.uniforms['uResolution'].value as THREE.Vector2).set(
-      mount.clientWidth,
+      initW,
       mount.clientHeight
     )
     composer.addPass(blurPass)
@@ -255,12 +387,40 @@ export function HeroCanvasCore({
       const t = timer.getElapsed()
       const c = ctrlRef.current
 
-      const useHardPreset =
-        process.env.NODE_ENV === 'production' && isMobileLandscapeRef.current
+      // WHY: stessa funzione usata nell'init — unica fonte di verità per la
+      // priority chain. In dev tutti i flag sono false; i valori arrivano da Leva.
+      const {
+        useLandscape: useHardPreset,
+        usePortrait: useMobilePortraitPreset,
+        useTablet: useTabletPreset,
+      } = resolvePresetFlags(
+        isMobileLandscapeRef.current,
+        isMobilePortraitRef.current,
+        isTabletRef.current
+      )
+      const camFov = useMobilePortraitPreset
+        ? MOBILE_PORTRAIT_PRESET.camFov
+        : useTabletPreset
+          ? TABLET_PRESET.camFov
+          : c.camFov
       const camZ = useHardPreset ? MOBILE_LANDSCAPE_PRESET.camZ : c.camZ
-      const posX = useHardPreset ? MOBILE_LANDSCAPE_PRESET.posX : c.posX
-      const posY = useHardPreset ? MOBILE_LANDSCAPE_PRESET.posY : c.posY
-      const scale = useHardPreset ? MOBILE_LANDSCAPE_PRESET.scale : c.scale
+      const posX = useHardPreset
+        ? MOBILE_LANDSCAPE_PRESET.posX
+        : useMobilePortraitPreset
+          ? MOBILE_PORTRAIT_PRESET.posX
+          : useTabletPreset
+            ? TABLET_PRESET.posX
+            : c.posX
+      const posY = useHardPreset
+        ? MOBILE_LANDSCAPE_PRESET.posY
+        : useTabletPreset
+          ? TABLET_PRESET.posY
+          : c.posY
+      const scale = useHardPreset
+        ? MOBILE_LANDSCAPE_PRESET.scale
+        : useTabletPreset
+          ? TABLET_PRESET.scale
+          : c.scale
 
       uniforms.u_time.value = t
       uniforms.u_speed.value = c.speed
@@ -322,13 +482,21 @@ export function HeroCanvasCore({
         ? MOBILE_LANDSCAPE_PRESET.vignetteBottom
         : c.vignetteBottom
 
-      if (camera.fov !== c.camFov || camera.position.z !== camZ) {
-        camera.fov = c.camFov
+      if (camera.fov !== camFov || camera.position.z !== camZ) {
+        camera.fov = camFov
         camera.position.z = camZ
         camera.updateProjectionMatrix()
       }
 
       composer.render()
+      // WHY: toDataURL va chiamato qui, subito dopo composer.render(),
+      // perché preserveDrawingBuffer è false — il buffer WebGL viene
+      // svuotato dal compositor del browser dopo ogni frame.
+      // Fuori dal loop toDataURL restituisce sempre un PNG vuoto.
+      if (typeof window !== 'undefined' && window.__heroCaptureRequested) {
+        window.__heroCaptureData = renderer.domElement.toDataURL('image/png')
+        window.__heroCaptureRequested = false
+      }
       if (canRender()) rafId = requestAnimationFrame(tick)
     }
 
@@ -362,8 +530,16 @@ export function HeroCanvasCore({
     let resizeDebounceId: ReturnType<typeof setTimeout> | null = null
     const executeResize = () => {
       resizeDebounceId = null
+      // WHY: stopLoop() garantisce che nessun tick() sia in volo mentre
+      // aggiorgiamo camera.aspect, renderer size e composer size.
+      // Il RAF era già fermato da onResize, ma onVisibility potrebbe averlo
+      // riavviato durante il debounce window di 150ms.
+      stopLoop()
       syncMobileLandscape()
-      const w = mount.clientWidth,
+      // WHY: stessa costante MIN_CANVAS_W usata al mount — il canvas non
+      // scende mai sotto 768px. mount.clientWidth = viewport_width perché
+      // il mount div è width:100% senza min-width CSS (vedi return JSX).
+      const w = Math.max(mount.clientWidth, MIN_CANVAS_W),
         h = mount.clientHeight
       camera.aspect = w / h
       camera.updateProjectionMatrix()
@@ -397,6 +573,8 @@ export function HeroCanvasCore({
       io.disconnect()
       document.removeEventListener('visibilitychange', onVisibility)
       mq.removeEventListener('change', syncMobileLandscape)
+      portraitMq.removeEventListener('change', syncMobilePortrait)
+      tabletMq.removeEventListener('change', syncTablet)
       window.removeEventListener('resize', onResize)
       if (mount.contains(renderer.domElement))
         mount.removeChild(renderer.domElement)
@@ -404,6 +582,10 @@ export function HeroCanvasCore({
       material.dispose()
       texture.dispose()
       msaaTarget.dispose()
+      // WHY: composer.dispose() rilascia il readBuffer interno di EffectComposer
+      // (un WebGLRenderTarget separato da msaaTarget/writeBuffer) che altrimenti
+      // resterebbe in GPU memory indefinitamente dopo l'unmount.
+      composer.dispose()
       renderer.dispose()
       timer.disconnect()
       timer.dispose()
@@ -419,6 +601,12 @@ export function HeroCanvasCore({
         inset: 'calc(-1 * 76px) 0 0 0',
         width: '100%',
         height: '100%',
+        // WHY: overflow:hidden clibba il canvas (renderizzato a min 768px)
+        // quando il viewport è più stretto, senza espandere il document width
+        // né causare browser auto-zoom. Il bleed di 76px dietro la navbar è
+        // preservato perché il clip avviene sui bordi del mount div stesso,
+        // che già estende 76px sopra la section.
+        overflow: 'hidden',
       }}
     />
   )

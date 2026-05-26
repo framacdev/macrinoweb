@@ -1,24 +1,28 @@
 /**
- * Percorsi statici poster hero (`public/textures/`).
+ * Percorsi statici poster hero (`public/ribbon-fallback/`).
  * Nessuna API o scan: `<picture>` in `HeroSection` usa solo queste costanti.
+ *
+ * Breakpoint applicati in HeroSection:
+ *   < 576px                                    → sportrait
+ *   < 768px  OU  mobile landscape              → tablet
+ *   768px – 1024px                             → lgtablet
+ *   > 1024px                                   → desktop
  */
 
-const TEXTURES = '/textures' as const
+const BASE = '/ribbon-fallback' as const
 
-/** Larghezze nei file `hero-canvas-poster-{w}.webp` (descrittori `w` in srcSet). */
-export const HERO_CANVAS_POSTER_WIDTHS = [320, 640, 960] as const
+// ── Small phone portrait (< 576px) ─────────────────────────────────────────
+export const HERO_POSTER_SPORTRAIT_WEBP = `${BASE}/herocanvasposter-sportrait.webp`
+export const HERO_POSTER_SPORTRAIT_PNG = `${BASE}/herocanvasposter-sportrait.png`
 
-/** Touch mobile: srcSet WebP responsive (`hero-canvas-poster-{w}.webp`). */
-export const HERO_POSTER_MOBILE_TOUCH_WEBP_SRCSET =
-  HERO_CANVAS_POSTER_WIDTHS.map(
-    (w) => `${TEXTURES}/hero-canvas-poster-${w}.webp ${w}w`
-  ).join(', ')
+// ── Large phone portrait + mobile landscape (< 768px | landscape mobile) ───
+export const HERO_POSTER_TABLET_WEBP = `${BASE}/herocanvasposter-tablet.webp`
+export const HERO_POSTER_TABLET_PNG = `${BASE}/herocanvasposter-tablet.png`
 
-/** Desktop: WebP singolo (primario). */
-export const HERO_POSTER_DESKTOP_WEBP = `${TEXTURES}/hero-canvas-poster.webp`
+// ── Tablet / laptop compatto (768px – 1024px) ───────────────────────────────
+export const HERO_POSTER_LGTABLET_WEBP = `${BASE}/herocanvasposter-lgtablet.webp`
+export const HERO_POSTER_LGTABLET_PNG = `${BASE}/herocanvasposter-lgtablet.png`
 
-/** Desktop: PNG (secondario / `<img>`). */
-export const HERO_POSTER_DESKTOP_PNG = `${TEXTURES}/hero-canvas-poster.png`
-
-/** Mobile: PNG (secondario sotto `(pointer: coarse)`). */
-export const HERO_POSTER_MOBILE_PNG = `${TEXTURES}/hero-canvas-mobile.png`
+// ── Desktop (> 1024px) ──────────────────────────────────────────────────────
+export const HERO_POSTER_DESKTOP_WEBP = `${BASE}/herocanvasposter-desktop.webp`
+export const HERO_POSTER_DESKTOP_PNG = `${BASE}/herocanvasposter-desktop.png`

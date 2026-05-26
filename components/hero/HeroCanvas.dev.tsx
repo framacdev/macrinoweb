@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef } from 'react'
 
 import { HERO_RIBBON_CONTROL_DEFAULTS } from '@/lib/hero/heroControlDefaults'
 import { MOBILE_LANDSCAPE_PRESET } from '@/lib/hero/heroMobileLandscapePreset'
+import { MOBILE_PORTRAIT_PRESET } from '@/lib/hero/heroMobilePortraitPreset'
+import { TABLET_PRESET } from '@/lib/hero/heroTabletPreset'
 
 import { HeroCanvasCore, type HeroCanvasProps } from './HeroCanvasCore'
 
@@ -23,6 +25,20 @@ const ML_GUARD_PATHS = [
   'Camera & Posizione.scale',
   'Vignetta Blur (bordi).vignetteLeft',
   'Vignetta Blur (bordi).vignetteBottom',
+] as const
+
+/** Leva store paths toccati dal preset mobile portrait (< 576px). */
+const MOBILE_PORTRAIT_GUARD_PATHS = [
+  'Camera & Posizione.camFov',
+  'Camera & Posizione.posX',
+] as const
+
+/** Leva store paths toccati dal preset tablet (768px–1024px). */
+const TABLET_GUARD_PATHS = [
+  'Camera & Posizione.camFov',
+  'Camera & Posizione.posX',
+  'Camera & Posizione.posY',
+  'Camera & Posizione.scale',
 ] as const
 
 export default function HeroCanvasDev(props: HeroCanvasProps) {
@@ -393,11 +409,65 @@ export default function HeroCanvasDev(props: HeroCanvasProps) {
     [setControls]
   )
 
+  const onMobilePortraitMatchChange = useCallback(
+    (matches: boolean) => {
+      // Abort se Leva ha già disposto i path (unmount/remount cycle).
+      if (
+        MOBILE_PORTRAIT_GUARD_PATHS.some(
+          (p) => levaStore.getInput(p) === undefined
+        )
+      )
+        return
+
+      if (matches) {
+        setControls({
+          camFov: MOBILE_PORTRAIT_PRESET.camFov,
+          posX: MOBILE_PORTRAIT_PRESET.posX,
+        })
+        return
+      }
+      // Reset ai default desktop quando si esce dal range mobile portrait.
+      setControls({
+        camFov: d.camFov,
+        posX: d.posX,
+      })
+    },
+    [setControls]
+  )
+
+  const onTabletMatchChange = useCallback(
+    (matches: boolean) => {
+      // Abort se Leva ha già disposto i path (unmount/remount cycle).
+      if (TABLET_GUARD_PATHS.some((p) => levaStore.getInput(p) === undefined))
+        return
+
+      if (matches) {
+        setControls({
+          camFov: TABLET_PRESET.camFov,
+          posX: TABLET_PRESET.posX,
+          posY: TABLET_PRESET.posY,
+          scale: TABLET_PRESET.scale,
+        })
+        return
+      }
+      // Reset ai default desktop quando si esce dal range tablet.
+      setControls({
+        camFov: d.camFov,
+        posX: d.posX,
+        posY: d.posY,
+        scale: d.scale,
+      })
+    },
+    [setControls]
+  )
+
   return (
     <HeroCanvasCore
       {...props}
       ctrlRef={ctrlRef}
       onMobileLandscapeMatchChange={onMobileLandscapeMatchChange}
+      onMobilePortraitMatchChange={onMobilePortraitMatchChange}
+      onTabletMatchChange={onTabletMatchChange}
     />
   )
 }
