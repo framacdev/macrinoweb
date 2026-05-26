@@ -12,16 +12,6 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 
-// WHY: estende Window con le tre sentinelle usate dalla pagina /capture-poster
-// per comunicare con il render loop WebGL senza prop drilling né ref esterni.
-declare global {
-  interface Window {
-    __heroCanvasReady?: boolean
-    __heroCaptureRequested?: boolean
-    __heroCaptureData?: string
-  }
-}
-
 import type { HeroRibbonControls } from '@/lib/hero/heroControlDefaults'
 import {
   MOBILE_LANDSCAPE_MQ,
@@ -234,7 +224,6 @@ export function HeroCanvasCore({
         renderer.initTexture(texture)
         mount.style.opacity = '1'
         fireCanvasReadyOnce()
-        if (typeof window !== 'undefined') window.__heroCanvasReady = true
       },
       undefined,
       () => {
@@ -489,14 +478,6 @@ export function HeroCanvasCore({
       }
 
       composer.render()
-      // WHY: toDataURL va chiamato qui, subito dopo composer.render(),
-      // perché preserveDrawingBuffer è false — il buffer WebGL viene
-      // svuotato dal compositor del browser dopo ogni frame.
-      // Fuori dal loop toDataURL restituisce sempre un PNG vuoto.
-      if (typeof window !== 'undefined' && window.__heroCaptureRequested) {
-        window.__heroCaptureData = renderer.domElement.toDataURL('image/png')
-        window.__heroCaptureRequested = false
-      }
       if (canRender()) rafId = requestAnimationFrame(tick)
     }
 
