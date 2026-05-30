@@ -13,6 +13,8 @@ export const C = {
   primary: '#2273D4',
   primaryHover: '#1A5BB8',
   accent: '#3da9fc',
+  // WHY: hover del primary in dark mode (fondo accent). Vedi primaryButtonStyle.
+  accentHover: '#2a9ae8',
   secondary: '#2273d480',
 
   // ── Borders & UI elements ──────────────────────────────────────────────
@@ -23,5 +25,4 @@ export const C = {
   // ── Effects (shadow, glow) ─────────────────────────────────────────────
   floatingShadow:
     '0 15px 35px rgba(34, 115, 212, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07)',
-  ctaHoverShadow: '0px 4px 12px 0px rgba(0, 0, 0, 0.15)',
 } as const

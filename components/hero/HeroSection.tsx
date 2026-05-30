@@ -17,58 +17,34 @@ import {
   HERO_POSTER_TABLET_PNG,
   HERO_POSTER_TABLET_WEBP,
 } from '@/lib/hero/heroPosterSources'
-import { MOBILE_LANDSCAPE_MQ } from '@/lib/hero/heroMobileLandscapePreset'
 import { hasWebGL } from '@/lib/hero/hasWebGL'
 
 import HeroCanvas from './HeroCanvas'
+import HeroContent from './HeroContent'
 
-// WHY: riusa MOBILE_LANDSCAPE_MQ già definita in heroMobileLandscapePreset
-// anziché duplicare la stringa. La virgola CSS (OR) combina i due casi:
-// phone portrait 576–767px  OU  phone landscape con pointer coarse ≤ 1024px.
+// WHY: media query del poster di fallback "tablet" — phone portrait ≤ 767px
+// OPPURE phone landscape (orientation + pointer coarse, ≤ 1024px). La stringa
+// landscape vive qui perché, rimossi i preset ribbon per-breakpoint, questo
+// <picture> è il suo unico consumer. La virgola CSS è un OR fra i due casi.
+const MOBILE_LANDSCAPE_MQ =
+  '(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)' as const
 const TABLET_MEDIA = `(max-width: 767px), ${MOBILE_LANDSCAPE_MQ}` as const
 
 export default function HeroSection() {
   const [posterHidden, setPosterHidden] = useState(false)
   const [showPoster, setShowPoster] = useState(true)
   const [webglSupported, setWebglSupported] = useState<boolean | null>(null)
-  // WHY: undefined = pre-hydration (SSR usa '100dvh'). Dopo il primo RAF
-  // viene fissato a window.innerHeight px e non cambia mai più, replicando
-  // il comportamento di Stripe (hero height fissa, immune a resize verticale
-  // e alla URL bar mobile che appare/scompare).
-  const [heroHeight, setHeroHeight] = useState<number | undefined>(undefined)
 
   useEffect(() => {
+    // WHY: il check WebGL gira dopo il primo RAF (un frame dopo l'hydration)
+    // così il canvas monta solo client-side. L'altezza della hero NON è più
+    // misurata in JS: è pilotata interamente da --hero-h (globals.css), che
+    // sotto i 1024px è un valore fisso in px immune alla URL bar mobile —
+    // più solido del vecchio window.innerHeight, senza flash né listener.
     const id = window.requestAnimationFrame(() => {
-      // WHY: setWebglSupported e setHeroHeight nello stesso RAF callback →
-      // React 18 li batcha in un unico re-render. Il canvas monta già con
-      // la section alla sua altezza definitiva, evitando un'inizializzazione
-      // a 100dvh che poi non verrebbe mai aggiornata.
       setWebglSupported(hasWebGL())
-      setHeroHeight(window.innerHeight)
     })
     return () => cancelAnimationFrame(id)
-  }, [])
-
-  useEffect(() => {
-    const updateHeight = () => {
-      // WHY: orientationchange (e screen.orientation 'change') fires PRIMA
-      // che il browser aggiorni window.innerHeight con le nuove dimensioni
-      // post-rotazione. 100ms è sufficiente su iOS e Android per leggere
-      // il valore finale stabile. Il window 'resize' che segue la rotazione
-      // fa scattare executeResize in HeroCanvasCore (150ms debounce), che
-      // leggerà mount.clientHeight già aggiornato da questo setState.
-      setTimeout(() => setHeroHeight(window.innerHeight), 100)
-    }
-
-    // screen.orientation.change è l'API moderna (Chrome/Firefox/Safari ≥ 16.4).
-    // 'orientationchange' su window è il fallback legacy (Safari < 16.4, WebView).
-    if (typeof screen.orientation !== 'undefined') {
-      screen.orientation.addEventListener('change', updateHeight)
-      return () =>
-        screen.orientation.removeEventListener('change', updateHeight)
-    }
-    window.addEventListener('orientationchange', updateHeight)
-    return () => window.removeEventListener('orientationchange', updateHeight)
   }, [])
 
   const onCanvasReady = useCallback(() => {
@@ -80,10 +56,10 @@ export default function HeroSection() {
       style={{
         position: 'relative',
         width: '100%',
-        // WHY: '100dvh' come fallback SSR (nessun hydration mismatch).
-        // Dopo il RAF viene sostituito con window.innerHeight px fissi:
-        // da quel momento l'altezza è immune a qualsiasi resize successivo.
-        height: heroHeight !== undefined ? `${heroHeight}px` : '100dvh',
+        // WHY: altezza pilotata da --hero-h (globals.css): 100dvh su desktop,
+        // 700px portrait / 600px landscape sotto i 1024px. Risolta già a SSR
+        // dalla CSS var → nessun hydration mismatch e nessun flash.
+        height: 'var(--hero-h)',
         backgroundColor: 'var(--color-bg)',
         transition: 'background-color 0.3s ease',
       }}
@@ -156,20 +132,56 @@ export default function HeroSection() {
           />
         </picture>
       ) : null}
+      {/* WHY: isolation:isolate racchiude canvas, overlay e contenuto nello stesso
+          stacking context. Il mix-blend-mode del paragrafo (HeroContent) si fonde
+          coi pixel del ribbon dipinti nello stesso contesto, mentre isolation:isolate
+          confina il blend a questo gruppo senza influenzare il resto della pagina.
+          L'ordine DOM (canvas → overlay → contenuto) definisce l'ordine di pittura
+          senza z-index interni, che creerebbero stacking context isolati e
+          interromperebbero il blend. */}
       <div
         style={{
-          position: 'relative',
+          position: 'absolute',
+          inset: 0,
           zIndex: 1,
-          width: '100%',
-          height: '100%',
+          isolation: 'isolate',
         }}
       >
-        {/* WHY: heroHeight !== undefined garantisce che la section sia già
-            alla sua altezza fissa quando HeroCanvasCore legge mount.clientHeight
-            al mount — evita un'inizializzazione del renderer all'altezza 100dvh. */}
-        {webglSupported === true && heroHeight !== undefined ? (
-          <HeroCanvas onCanvasReady={onCanvasReady} />
-        ) : null}
+        {/* WHY: la section ha già la sua altezza --hero-h (CSS) al primo paint,
+            quindi quando HeroCanvasCore legge mount.clientHeight al mount il
+            valore è corretto. Su rotazione il window 'resize' fa rileggere la
+            nuova clientHeight (700↔600) tramite executeResize in HeroCanvasCore. */}
+        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+          {webglSupported === true ? (
+            <HeroCanvas onCanvasReady={onCanvasReady} />
+          ) : null}
+        </div>
+
+        {/* WHY: UNICO overlay di wash del sito. Sfuma il ribbon verso --color-bg
+            nell'angolo in alto a sinistra, staccando badge, H1 e bottoni. Il
+            bleed di --hero-nav-h (come poster e mount div del canvas) lo fa
+            salire ANCHE dietro l'header: con la card dell'header trasparente a
+            riposo, header e hero condividono questo stesso gradient continuo,
+            senza un secondo overlay da accendere/spegnere. Sta sopra il canvas e
+            sotto tutta la UI (ordine DOM), quindi tinge solo il ribbon. */}
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            // WHY: stesso inset di poster e mount div del canvas → il wash copre
+            // la fascia dietro la navbar e parte dal vero angolo (0,0) di pagina.
+            inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
+            height: '100%',
+            background:
+              'linear-gradient(to bottom right, var(--color-bg) 0%, transparent 45%)',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Contenuto hero — badge, h1, paragrafo, bottoni */}
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <HeroContent />
+        </div>
       </div>
     </section>
   )

@@ -97,7 +97,7 @@ export const HERO_RIBBON_CONTROL_DEFAULTS: HeroRibbonControls = {
   rotZ: -1.53,
   posX: -4.35,
   posY: -0.95,
-  scale: 2.5,
+  scale: 3.65,
 }
 
 export function cloneHeroRibbonDefaults(): HeroRibbonControls {

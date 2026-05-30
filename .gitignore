@@ -45,3 +45,7 @@ next-env.d.ts
 # AI tools
 .claude/
 .roo/
+.clinerules
+
+# local scratch / report artifacts (hanno un proprio node_modules)
+/reports/

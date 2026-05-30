@@ -27,7 +27,12 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { Sun, Moon } from 'lucide-react'
 import MacrinoLogo from '@/components/ui/MacrinoLogo'
+import AnimatedArrowIcon from '@/components/ui/AnimatedArrowIcon'
 import { C } from '@/lib/constants'
+import {
+  primaryButtonStyle,
+  primaryButtonForeground,
+} from '@/lib/primaryButtonStyle'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COSTANTI — centralizzate qui per non ripetere stringhe e valori nei JSX
@@ -39,70 +44,6 @@ const NAV_ITEMS = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AnimatedArrowIcon — ChevronRight che diventa ArrowRight sull'hover della CTA
-// ─────────────────────────────────────────────────────────────────────────────
-
-function AnimatedArrowIcon({ isHovered }: { isHovered: boolean }) {
-  /*
-   * Due path separati con coordinate calibrate per connessione perfetta:
-   *
-   * ASTA: M0 8 L7 8
-   *   strokeLinecap="round" → si estende visivamente fino a x=7.875
-   *   pathLength da 0 a 1 → l'asta si rivela da sinistra
-   *   opacity 0→1 per evitare artefatti sul cap sinistro
-   *
-   * PUNTA: M6 3.5 L12 8 L6 12.5
-   *   leftmost a x=6, con round cap estesa visivamente fino a x=5.125
-   *   translateX 0→2 su hover → leftmost visivo si sposta a x=7.125
-   *   Overlap con asta (7.125 < 7.875): connessione garantita ad ogni frame
-   *
-   * CONTAINER: 20px fissi, overflow hidden
-   *   La punta hovered raggiunge x=14, mai oltre 20px → nessun clipping
-   *   Il button non cambia mai larghezza
-   */
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        width: '20px',
-        height: '16px',
-        marginRight: '-8px',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
-      <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
-        {/* Asta */}
-        <motion.path
-          d="M 4 8 L 12 8"
-          stroke="white"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          style={{ zIndex: -1 }}
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{
-            pathLength: isHovered ? 1 : 0,
-            opacity: isHovered ? 1 : 0,
-          }}
-          transition={{ duration: 0.15, ease: 'easeInOut' }}
-        />
-        {/* Punta — si sposta leggermente a destra sull'hover */}
-        <motion.path
-          d="M 7 3.5 L 12 8 L 7 12.5"
-          stroke="white"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          animate={{ x: isHovered ? 2 : 0 }}
-          transition={{ duration: 0.15, ease: 'easeInOut' }}
-        />
-      </svg>
-    </span>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // CTAButton — bottone "Contattami"
 //
 // È un <Link> Next.js che renderizza un <a> con stili da bottone.
@@ -111,7 +52,13 @@ function AnimatedArrowIcon({ isHovered }: { isHovered: boolean }) {
 // nel mobile menu (gestito tramite justify-content: space-between sul parent).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function CTAButton({ onClick }: { onClick?: () => void }) {
+function CTAButton({
+  isDark,
+  onClick,
+}: {
+  isDark: boolean
+  onClick?: () => void
+}) {
   const [isHovered, setIsHovered] = useState(false)
 
   return (
@@ -122,29 +69,30 @@ function CTAButton({ onClick }: { onClick?: () => void }) {
       onPointerLeave={() => setIsHovered(false)}
       onPointerCancel={() => setIsHovered(false)}
       style={{
+        // Layout proprio della CTA (compatta, 16px). L'ASPETTO (fill, gradiente,
+        // profondità, hover, foreground) arriva da primaryButtonStyle — stessa
+        // single source del primary hero — ma SENZA alone (withHalo: false).
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: '4px',
         padding: '10px 28px',
-        backgroundColor: isHovered ? C.primaryHover : C.primary,
-        color: C.bg,
         borderRadius: '4px',
-        border: `1px solid ${isHovered ? C.primaryHover : C.primary}`,
         cursor: 'pointer',
         fontFamily: 'var(--font-inter)',
         fontWeight: '600',
         letterSpacing: '0.02em',
         fontSize: '16px',
         whiteSpace: 'nowrap',
-        boxShadow: isHovered ? C.ctaHoverShadow : 'none',
         textDecoration: 'none',
-        transition:
-          'background-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out',
+        ...primaryButtonStyle({ isDark, isHovered, withHalo: false }),
       }}
     >
       Contattami
-      <AnimatedArrowIcon isHovered={isHovered} />
+      <AnimatedArrowIcon
+        isHovered={isHovered}
+        color={primaryButtonForeground(isDark)}
+      />
     </Link>
   )
 }
@@ -468,7 +416,7 @@ function MobileMenu({
           }}
         >
           {/* CTA Contattami — larghezza naturale, posizionata a sinistra */}
-          <CTAButton onClick={onClose} />
+          <CTAButton isDark={isDark} onClick={onClose} />
 
           {/* Switch tema — quadrato (aspect-ratio 1:1), icon-only */}
           <button
@@ -608,11 +556,13 @@ export default function Header() {
   const isDark = mounted && theme === 'dark'
 
   // Sfondo della card interna:
-  // - Non floating: solido (dark o white) via CSS variable
+  // - Non floating: TRASPARENTE → lascia passare il wash UNICO della HeroSection
+  //   (overlay del ribbon, con bleed dietro l'header), così header e hero sono
+  //   un solo gradient continuo e non c'è un fondo che copra il ribbon
   // - Floating in dark mode con menu aperto: dark navy solido
   // - Floating altrimenti: bianco semi-trasparente per il blur effect
   const innerCardBg = (() => {
-    if (!isFloating) return 'var(--color-bg)'
+    if (!isFloating) return 'transparent'
     if (isDark && isMenuOpen) return '#0f1e2d'
     return 'rgba(255, 255, 254, 0.88)'
   })()
@@ -636,7 +586,10 @@ export default function Header() {
         ref={headerRef}
         className="sticky top-0 z-50 w-full"
         style={{
-          // Sfondo sempre trasparente (il canvas / la hero forniscono il colore)
+          // WHY: header trasparente — il wash --color-bg arriva dall'overlay
+          // UNICO della HeroSection, che ha un bleed di --hero-nav-h e sale
+          // anche dietro la navbar. Nessun position inline: lo `sticky` del
+          // className non va sovrascritto.
           background: 'transparent',
           borderBottom:
             !isFloating && !isMobile
@@ -647,6 +600,11 @@ export default function Header() {
           transition: 'border-color 0.3s ease',
         }}
       >
+        {/* WHY: nessun overlay/gradient qui. Il wash --color-bg è UNO solo, in
+            HeroSection: il suo overlay sul ribbon ha un bleed di --hero-nav-h
+            (come poster e canvas) e copre già la fascia dietro l'header. Con la
+            card trasparente a riposo (innerCardBg), header e hero mostrano lo
+            stesso identico gradient: niente secondo layer da sincronizzare. */}
         {/* Container max-width — "il container dell'header" */}
         <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '8px' }}>
           {/* Card interna — "l'header vero e proprio" — quella che fluttua */}
@@ -764,7 +722,7 @@ export default function Header() {
 
               {/* CTA Contattami — solo desktop */}
               <div className="hidden lg:block">
-                <CTAButton />
+                <CTAButton isDark={isDark} />
               </div>
 
               {/* Hamburger — solo mobile/tablet */}

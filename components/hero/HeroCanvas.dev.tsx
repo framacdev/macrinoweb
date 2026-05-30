@@ -1,48 +1,16 @@
 'use client'
 
-import { useControls, folder, levaStore } from 'leva'
-import { useCallback, useEffect, useRef } from 'react'
+import { useControls, folder } from 'leva'
+import { useEffect, useRef } from 'react'
 
 import { HERO_RIBBON_CONTROL_DEFAULTS } from '@/lib/hero/heroControlDefaults'
-import { MOBILE_LANDSCAPE_PRESET } from '@/lib/hero/heroMobileLandscapePreset'
-import { MOBILE_PORTRAIT_PRESET } from '@/lib/hero/heroMobilePortraitPreset'
-import { TABLET_PRESET } from '@/lib/hero/heroTabletPreset'
 
 import { HeroCanvasCore, type HeroCanvasProps } from './HeroCanvasCore'
 
 const d = HERO_RIBBON_CONTROL_DEFAULTS
 
-/**
- * Full Leva store paths for every key touched by the mobile-landscape preset.
- * Format: "<FolderName>.<keyName>" — mirrors exactly the folder/key names below.
- * levaStore.getInput(path) returns undefined when Leva has disposed those paths
- * (unmount / remount cycle), so we abort before calling setControls.
- */
-const ML_GUARD_PATHS = [
-  'Camera & Posizione.camZ',
-  'Camera & Posizione.posX',
-  'Camera & Posizione.posY',
-  'Camera & Posizione.scale',
-  'Vignetta Blur (bordi).vignetteLeft',
-  'Vignetta Blur (bordi).vignetteBottom',
-] as const
-
-/** Leva store paths toccati dal preset mobile portrait (< 576px). */
-const MOBILE_PORTRAIT_GUARD_PATHS = [
-  'Camera & Posizione.camFov',
-  'Camera & Posizione.posX',
-] as const
-
-/** Leva store paths toccati dal preset tablet (768px–1024px). */
-const TABLET_GUARD_PATHS = [
-  'Camera & Posizione.camFov',
-  'Camera & Posizione.posX',
-  'Camera & Posizione.posY',
-  'Camera & Posizione.scale',
-] as const
-
 export default function HeroCanvasDev(props: HeroCanvasProps) {
-  const [controls, setControls] = useControls(
+  const [controls] = useControls(
     () => ({
       'Twist (3 assi)': folder({
         twistFrequencyX: {
@@ -379,95 +347,5 @@ export default function HeroCanvasDev(props: HeroCanvasProps) {
     ctrlRef.current = controls
   }, [controls])
 
-  const onMobileLandscapeMatchChange = useCallback(
-    (matches: boolean) => {
-      // Abort if Leva has disposed any of the affected paths (unmount/remount cycle).
-      // levaStore.getInput returns undefined for paths not currently registered.
-      if (ML_GUARD_PATHS.some((p) => levaStore.getInput(p) === undefined))
-        return
-
-      if (matches) {
-        setControls({
-          camZ: MOBILE_LANDSCAPE_PRESET.camZ,
-          posX: MOBILE_LANDSCAPE_PRESET.posX,
-          posY: MOBILE_LANDSCAPE_PRESET.posY,
-          scale: MOBILE_LANDSCAPE_PRESET.scale,
-          vignetteLeft: MOBILE_LANDSCAPE_PRESET.vignetteLeft,
-          vignetteBottom: MOBILE_LANDSCAPE_PRESET.vignetteBottom,
-        })
-        return
-      }
-      setControls({
-        camZ: d.camZ,
-        posX: d.posX,
-        posY: d.posY,
-        scale: d.scale,
-        vignetteLeft: d.vignetteLeft,
-        vignetteBottom: d.vignetteBottom,
-      })
-    },
-    [setControls]
-  )
-
-  const onMobilePortraitMatchChange = useCallback(
-    (matches: boolean) => {
-      // Abort se Leva ha già disposto i path (unmount/remount cycle).
-      if (
-        MOBILE_PORTRAIT_GUARD_PATHS.some(
-          (p) => levaStore.getInput(p) === undefined
-        )
-      )
-        return
-
-      if (matches) {
-        setControls({
-          camFov: MOBILE_PORTRAIT_PRESET.camFov,
-          posX: MOBILE_PORTRAIT_PRESET.posX,
-        })
-        return
-      }
-      // Reset ai default desktop quando si esce dal range mobile portrait.
-      setControls({
-        camFov: d.camFov,
-        posX: d.posX,
-      })
-    },
-    [setControls]
-  )
-
-  const onTabletMatchChange = useCallback(
-    (matches: boolean) => {
-      // Abort se Leva ha già disposto i path (unmount/remount cycle).
-      if (TABLET_GUARD_PATHS.some((p) => levaStore.getInput(p) === undefined))
-        return
-
-      if (matches) {
-        setControls({
-          camFov: TABLET_PRESET.camFov,
-          posX: TABLET_PRESET.posX,
-          posY: TABLET_PRESET.posY,
-          scale: TABLET_PRESET.scale,
-        })
-        return
-      }
-      // Reset ai default desktop quando si esce dal range tablet.
-      setControls({
-        camFov: d.camFov,
-        posX: d.posX,
-        posY: d.posY,
-        scale: d.scale,
-      })
-    },
-    [setControls]
-  )
-
-  return (
-    <HeroCanvasCore
-      {...props}
-      ctrlRef={ctrlRef}
-      onMobileLandscapeMatchChange={onMobileLandscapeMatchChange}
-      onMobilePortraitMatchChange={onMobilePortraitMatchChange}
-      onTabletMatchChange={onTabletMatchChange}
-    />
-  )
+  return <HeroCanvasCore {...props} ctrlRef={ctrlRef} />
 }

@@ -29,17 +29,74 @@ html {
   --color-accent: #3da9fc;
   --color-header-border: #e5eeff;
   --color-menu-item-border: #e5eeff;
+  /* WHY: grigio-blu per il paragrafo hero in light mode con mix-blend-mode:multiply.
+     La variante dark usa #fffffe perché multiply su testo chiaro su fondo scuro
+     produrrebbe testo invisibile; il colore chiaro senza blend è la scelta corretta. */
+  --color-body-hero: #5c7ca6;
   --font-heading: var(--font-plus-jakarta), sans-serif;
   --font-body: var(--font-inter), sans-serif;
   /* WHY: altezza della navbar — usata da HeroSection e HeroCanvasCore per
      calcolare il bleed dietro la navbar. Definita in CSS (non in JS) così
      il valore è corretto fin dal primo render SSR, senza flash post-hydration. */
   --hero-nav-h: 76px;
+  /* WHY: altezza della hero, alla maniera di Stripe — pilotata da media query
+     CSS invece che da window.innerHeight in JS. Sul desktop segue il viewport
+     (100dvh), mentre sotto i 1024px diventa un valore FISSO in px (700 portrait,
+     600 landscape): immune alla URL bar mobile che appare/scompare e ai resize
+     verticali, senza flash post-hydration né listener orientationchange. */
+  --hero-h: 100dvh;
+  /* WHY: padding del div copy della hero, anch'esso responsivo via CSS var così
+     resta una singola sorgente di verità condivisa con --hero-nav-h. */
+  --hero-copy-pad: calc(var(--hero-nav-h) + 48px) 24px 24px;
 }
 
 @media (max-width: 1024px) {
   :root {
     --hero-nav-h: 64px;
+    --hero-h: 700px;
+    --hero-copy-pad: calc(var(--hero-nav-h) + 8px) 16px 16px;
+  }
+}
+
+/* WHY: sotto i 1024px in landscape la hero si abbassa a 600px (meno spazio
+   verticale). Segue il blocco max-width:1024px per sovrascriverne il 700px. */
+@media (max-width: 1024px) and (orientation: landscape) {
+  :root {
+    --hero-h: 600px;
+  }
+}
+
+/* WHY: i CTA della hero (.hero-cta) diventano responsivi via classe — i <Button>
+   sono componenti senza prop style, quindi il selettore discendente raggiunge
+   l'<a>/<button> reso senza toccarne l'API. Due soglie SOVRAPPOSTE (entrambe
+   max-width, non range adiacenti) così nessuna larghezza resta scoperta, nemmeno
+   quelle frazionarie da zoom/DPR. I .98 rendono le soglie esclusive ("sotto i Npx"):
+
+   • < 640px → unica row, ogni CTA flex:1: crescono insieme a riempire la riga,
+     testo centrato (il bottone è più largo del contenuto, che col justify-content
+     di default — flex-start — resterebbe a sinistra). Il contenitore non ha più
+     flex-wrap inline: il default nowrap garantisce l'unica row.
+   • < 389px → i CTA si impilano in colonna a tutta larghezza (width:100% +
+     box-sizing:border-box globale = nessun overflow). flex:none azzera il grow
+     (in colonna sarebbe verticale). Il blocco 389 segue il 640, così dove
+     entrambi combaciano vince (stessa specificità → conta l'ordine sorgente). */
+@media (max-width: 639.98px) {
+  .hero-cta > a,
+  .hero-cta > button {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 388.98px) {
+  .hero-cta {
+    flex-direction: column;
+  }
+
+  .hero-cta > a,
+  .hero-cta > button {
+    flex: none;
+    width: 100%;
   }
 }
 
@@ -52,6 +109,7 @@ html {
      la stessa tinta ma si adattano al fondo dark senza introdurre nuovi colori. */
   --color-header-border: rgba(229, 238, 255, 0.08);
   --color-menu-item-border: rgba(229, 238, 255, 0.04);
+  --color-body-hero: #fffffe;
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
