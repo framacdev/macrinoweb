@@ -11,13 +11,22 @@ const containerVariants: Variants = {
   visible: { transition: { staggerChildren: 0.15 } },
 }
 
+// ease-out (non easeInOut): per gli ingressi il movimento decelera verso la
+// posizione finale, più naturale di una curva simmetrica.
 const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: 'easeInOut' },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
   },
+}
+
+// In reduced-motion l'entrata diventa un semplice crossfade: niente movimento
+// di posizione, solo opacità. Prima copriva solo il LED, non l'ingresso (P2).
+const itemVariantsReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.3, ease: 'linear' } },
 }
 
 export default function HeroContent() {
@@ -31,6 +40,7 @@ export default function HeroContent() {
   }, [])
 
   const isDark = mounted && theme === 'dark'
+  const item = prefersReducedMotion ? itemVariantsReduced : itemVariants
 
   // WHY: token del LED "online" derivati dalla palette. mid = colore del LED
   // (l'accent #3da9fc su entrambi i temi, per coerenza con il brand), edge =
@@ -57,29 +67,20 @@ export default function HeroContent() {
   const ledGlowHigh = `${ledGloss}, 0 0 4px 1.5px rgba(${led.glow},0.92), 0 0 9px 3px rgba(${led.glow},0.50), 0 0 16px 5px rgba(${led.glow},0.24)`
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}
-    >
-      {/* WHY: div intermedio centrato a 1300px — il wrapper assoluto copre
-          tutta la section, questo div allinea il copy alla stessa griglia
-          usata dalle future section del sito senza toccare il layout globale. */}
+    // WHY: contenuto IN-FLOW (non più position:absolute) — è ciò che dà l'altezza
+    // alla section, che usa min-height come floor (vedi HeroSection). Quando il
+    // copy supera il viewport (mobile landscape) la section cresce e niente
+    // trabocca. NIENTE position/z-index/transform su questa catena di wrapper:
+    // creerebbe uno stacking context e impedirebbe al mix-blend-mode del
+    // paragrafo di fondere col ribbon (z-index:-1) dipinto dietro.
+    <div className="w-full flex justify-center">
+      {/* div intermedio: container a 1300px, stessa griglia delle future section.
+          Il padding-top di --hero-copy-pad spinge il copy sotto la navbar.
+          maxWidth/padding restano inline: il padding è una CSS var responsiva. */}
       <div
+        className="w-full"
         style={{
-          width: '100%',
           maxWidth: '1300px',
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'flex-start',
-          // WHY: --hero-copy-pad (vedi globals.css) garantisce che il contenuto
-          // parta sotto la navbar senza misurazioni JS ed è responsivo: desktop
-          // calc(--hero-nav-h + 48px) 24px 24px → ≤1024px calc(--hero-nav-h + 8px) 16px 16px.
           padding: 'var(--hero-copy-pad)',
         }}
       >
@@ -94,7 +95,7 @@ export default function HeroContent() {
           }}
         >
           {/* ── Badge ──────────────────────────────────────────────────── */}
-          <motion.div variants={itemVariants}>
+          <motion.div variants={item}>
             <div
               style={{
                 position: 'relative',
@@ -118,13 +119,11 @@ export default function HeroContent() {
                      linear-gradient(180deg, rgba(72,112,168,0.50) 0%, rgba(16,32,57,0.50) 100%)`
                   : `radial-gradient(140% 120% at 18% -15%, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0) 46%),
                      linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(220,233,251,0.70) 100%)`,
-                // WHY: cinque livelli per il volume del vetro — highlight interna
-                // sul bordo superiore (cresta), velo chiaro laterale sx (rifrazione
-                // del bordo), ombra interna sul fondo, drop shadow ravvicinata per
-                // l'elevazione, alone diffuso colorato per la profondità.
+                // highlight interna sul bordo superiore: simula la cresta di luce
+                // del vetro. Più tenue in dark (0.30) per non bruciare sul navy.
                 boxShadow: isDark
-                  ? ['inset 0 1px 0.5px rgba(255,255,255,0.30)'].join(', ')
-                  : ['inset 0 1px 0.5px rgba(255,255,255,1)'].join(', '),
+                  ? 'inset 0 1px 0.5px rgba(255,255,255,0.30)'
+                  : 'inset 0 1px 0.5px rgba(255,255,255,1)',
               }}
             >
               {/* WHY: pallina di vetro neon. Il radial-gradient costruisce la bead
@@ -153,56 +152,74 @@ export default function HeroContent() {
               />
               <span
                 style={{
-                  fontFamily: 'var(--font-inter)',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
+                  // WHY: JetBrains Mono earned nel badge — il LED + pill mono
+                  // legge come status indicator da terminale, segnale "dev"
+                  // confinato all'unico elemento dove ha senso semantico.
+                  // clamp 13→15px: mono è più largo di Nunito, parte da 13px
+                  // (un solo px sopra il precedente fisso) per mantenere
+                  // l'equilibrio visivo del pill su mobile.
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 'clamp(0.722rem, 1.5vw, 0.833rem)',
+                  fontWeight: 400,
+                  letterSpacing: '0.02em',
                   // WHY: navy #094067 in light = contrasto ~8:1 sul vetro chiaro,
                   // ben oltre la soglia 4.5:1 anche sopra il canvas animato.
-                  color: isDark ? '#FFFFFE' : C.text,
+                  color: isDark ? 'var(--color-text)' : C.text,
                 }}
               >
-                Freelance {'&'} open to work
+                {/* Desktop: testo completo — Mobile (<640px): versione breve */}
+                <span className="hidden sm:inline">Disponibile · freelance / full-time</span>
+                <span className="sm:hidden">Disponibile · full-time</span>
               </span>
             </div>
           </motion.div>
 
           {/* ── H1 ─────────────────────────────────────────────────────── */}
           <motion.h1
-            variants={itemVariants}
+            variants={item}
             style={{
-              maxWidth: 950,
-              fontFamily: 'var(--font-plus-jakarta)',
-              fontSize: 'clamp(2rem, 5vw, 3.111rem)',
+              maxWidth: 1050,
+              fontFamily: 'var(--font-heading)',
+              fontSize: 'clamp(2.222rem, 5.5vw, 3.333rem)',
               fontWeight: 800,
               letterSpacing: '-0.02em',
               lineHeight: 1.3,
               margin: 0,
-              // WHY: backgroundImage invece di background (shorthand) per evitare
-              // il conflitto React con backgroundClip — shorthand e longhand non
-              // possono coesistere nello stesso style object durante i re-render.
-              backgroundImage: isDark
-                ? 'linear-gradient(90deg, #2273D4 0%, #3FC8FF 70%, #FFFFFE 100%)'
-                : 'linear-gradient(90deg, #094067 0%, #2273D4 50%, #3FC8FF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              color: 'transparent',
-            }}
+              color: isDark ? 'var(--color-text)' : C.text,
+              textWrap: 'balance',
+            } as React.CSSProperties}
           >
-            Design e sviluppo, dall&apos;idea al risultato
+            Design e sviluppo, dall&apos;idea al{' '}
+            {/* WHY: gradiente confinato alla sola parola "risultato".
+                `color` è il fallback non-trasparente (WCAG).
+                Dark: bianco a sinistra per continuità col testo
+                circostante, poi ciano→blu (la parola "scende" in
+                profondità). Light: navy→primary→ciano. */}
+            <span
+              style={{
+                color: isDark ? C.accent : C.primary,
+                backgroundImage: isDark
+                  ? 'linear-gradient(90deg, var(--color-text) 0%, #2273D4 55%, #3FC8FF 100%)'
+                  : 'linear-gradient(90deg, #094067 0%, #2273D4 50%, #3FC8FF 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              risultato
+            </span>
           </motion.h1>
 
           {/* ── Paragrafo ──────────────────────────────────────────────── */}
           <motion.p
-            variants={itemVariants}
+            variants={item}
             style={{
-              fontFamily: 'var(--font-inter)',
+              fontFamily: 'var(--font-body)',
               fontSize: 'clamp(1.25rem, 2.5vw, 2rem)',
-              fontWeight: 500,
+              fontWeight: 600, // WHY: 600 (era 500) — aumenta contrasto gerarchico con Sora 800
               lineHeight: 1.2,
               margin: 0,
-              maxWidth: 950,
+              maxWidth: 1050,
               // WHY: --color-body-hero (#5C7CA6 in light, #fffffe in dark) è
               // dichiarato in globals.css e si adatta al tema via CSS variable,
               // senza dipendere da JS. In light mode multiply fa sì che il testo
@@ -229,19 +246,15 @@ export default function HeroContent() {
               passano a flex:1 (<640px) e a colonna full-width (<389px). */}
           <motion.div
             className="hero-cta"
-            variants={itemVariants}
+            variants={item}
             style={{
               display: 'flex',
               gap: '12px',
               marginTop: 8,
             }}
           >
-            <Button variant="primary" label="Iniziamo" href="#contatti" />
-            <Button
-              variant="secondary"
-              label="Vedi i progetti"
-              href="#portfolio"
-            />
+            <Button variant="primary" label="Parliamone" href="#contatti" />
+            <Button variant="secondary" label="Vedi i progetti" href="#portfolio" />
           </motion.div>
         </motion.div>
       </div>

@@ -72,6 +72,35 @@ const TIERS: readonly HeroCanvasQuality[] = [
   },
 ] as const
 
+// WHY: variante mobile del tier massimo. Stessa densità di mesh del desktop
+// (segmenti al cap, ~35k vertici), ma anti-aliasing via FXAA invece di MSAA 4×.
+// Su GPU mobile a tile l'MSAA 4× su un render target full-screen a DPR 2 costa
+// banda di memoria; FXAA è un singolo pass screen-space molto più economico.
+// I segmenti restano al massimo: il vertex processing è triviale anche su mobile,
+// il collo di bottiglia è il fill rate (DPR² × area × passi), non i vertici.
+// È così che un flagship ottiene "massima risoluzione e segmenti" restando fluido.
+const TIER_3_MOBILE: HeroCanvasQuality = {
+  tier: 3,
+  ...balancedTier(HERO_RIBBON_MAX_BALANCED_SEGMENTS),
+  pixelRatioCap: 2,
+  msaaSamples: 0,
+  fxaa: true,
+}
+
+/**
+ * Profilo per la cattura dei poster (route `/ribbon-capture`): massima densità
+ * di mesh + MSAA 4× per il miglior anti-aliasing su un singolo frame statico,
+ * e `pixelRatioCap: 1` perché il canvas è già renderizzato alla risoluzione
+ * esatta del poster (il devicePixelRatio raddoppierebbe il buffer e i file).
+ */
+export const HERO_CAPTURE_QUALITY: HeroCanvasQuality = {
+  tier: 3,
+  ...balancedTier(HERO_RIBBON_MAX_BALANCED_SEGMENTS),
+  pixelRatioCap: 1,
+  msaaSamples: 4,
+  fxaa: false,
+}
+
 function clampTier(n: number): HeroCanvasQualityTier {
   if (n <= 0) return 0
   if (n >= 3) return 3
@@ -79,7 +108,13 @@ function clampTier(n: number): HeroCanvasQualityTier {
 }
 
 /**
- * Heuristica CPU/GPU/batteria: nessuna dipendenza da Three.js (testabile).
+ * Heuristica CPU/GPU/rete: nessuna dipendenza da Three.js (testabile).
+ *
+ * Principio: classifica per CAPACITÀ reale, non per "è touch". I touch device
+ * NON vengono più declassati in blocco — un flagship mobile raggiunge il tier
+ * massimo (mesh piena) come un desktop. La differenza desktop/mobile al top non
+ * è la densità della mesh ma l'anti-aliasing: MSAA 4× su desktop, FXAA su touch
+ * (vedi {@link TIER_3_MOBILE}). Il DPR cap a 2 protegge il fill rate ovunque.
  */
 export function resolveHeroCanvasQuality(): HeroCanvasQuality {
   if (typeof window === 'undefined') return TIERS[1]
@@ -87,7 +122,11 @@ export function resolveHeroCanvasQuality(): HeroCanvasQuality {
   const nav = navigator as NavigatorWithMemory
   const cores =
     typeof nav.hardwareConcurrency === 'number' ? nav.hardwareConcurrency : 4
-  const memGiB = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : 8
+  // deviceMemory esiste solo su Chromium (Android / Chrome desktop). Su Safari
+  // (iOS e macOS) è undefined → null: in quel caso NON penalizziamo, perché la
+  // mancanza del segnale non deve declassare device Apple generalmente capaci.
+  const mem = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null
+  const dpr = window.devicePixelRatio || 1
   const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false
   const reducedMotion =
     window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
@@ -96,14 +135,39 @@ export function resolveHeroCanvasQuality(): HeroCanvasQuality {
     nav.connection?.effectiveType === 'slow-2g' ||
     nav.connection?.effectiveType === '2g'
 
-  let idx = 2
-  if (cores >= 8 && memGiB >= 8) idx = 3
-  else if (cores <= 4 || memGiB <= 4) idx = 1
-  if (cores <= 2 || memGiB <= 2) idx = 0
+  // Risparmio dati o rete lentissima → minimo assoluto.
+  if (saveData || slowNet) return TIERS[0]
 
-  if (coarse) idx -= 1
-  if (saveData || slowNet) idx -= 1
+  // mem ≤ 4 è il principale segnale anti-"octa-core economico": molti Android
+  // budget riportano 8 core ma 3–4GB e GPU deboli, e verrebbero altrimenti
+  // promossi per errore. dpr ≥ 3 è il segnale "device premium ad alta densità"
+  // (flagship phone), che con ≥ 6 core sblocca il tier massimo anche su iOS,
+  // dove deviceMemory non esiste e i core riportati sono 6.
+  const lowMem = mem !== null && mem <= 4
+  const veryLowMem = mem !== null && mem <= 2
+
+  let idx: number
+  if (cores <= 2 || veryLowMem) {
+    idx = 0
+  } else if (cores <= 4 || lowMem) {
+    idx = 1
+  } else if (cores >= 8 || (cores >= 6 && dpr >= 3)) {
+    // Octa-core con RAM adeguata (desktop / flagship Android) oppure 6-core ad
+    // alta densità (flagship iPhone / iPad Pro): tier massimo.
+    idx = 3
+  } else {
+    // 6-core mainstream, tablet medi: tier alto senza MSAA.
+    idx = 2
+  }
+
+  // prefers-reduced-motion: un grado di carico in meno (il ribbon resta, ma più
+  // leggero). Per a11y piena valuta il freeze completo del ribbon (vedi nota).
   if (reducedMotion) idx -= 1
 
-  return TIERS[clampTier(idx)]
+  const tier = clampTier(idx)
+
+  // Al tier massimo su touch usa la variante mobile (FXAA invece di MSAA 4×):
+  // mesh piena, ma senza il costo di banda dell'MSAA su GPU a tile.
+  if (tier === 3 && coarse) return TIER_3_MOBILE
+  return TIERS[tier]
 }

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 /**
  * AnimatedArrowIcon — ChevronRight che diventa ArrowRight sull'hover.
  *
- * Componente condiviso dal Button hero ("Iniziamo") e dalla CTA header
+ * Componente condiviso dal Button hero ("Parliamone") e dalla CTA header
  * ("Contattami"). `color` segue il foreground del primary (bianco in light,
  * navy su accent in dark): passarlo come prop invece di hardcodarlo è ciò che
  * permette l'unico componente per entrambi i temi e i due call-site.
@@ -31,22 +31,12 @@ export default function AnimatedArrowIcon({
   color: string
 }) {
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        width: '20px',
-        height: '16px',
-        marginRight: '-8px',
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
+    <span className="inline-flex items-center w-[20px] h-[16px] -mr-[8px] shrink-0 overflow-hidden">
       <svg width="20" height="16" viewBox="0 0 20 16" fill="none">
         {/* Asta */}
         <motion.path
           d="M 4 8 L 12 8"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="1.75"
           strokeLinecap="round"
           initial={{ pathLength: 0, opacity: 0 }}
@@ -59,7 +49,7 @@ export default function AnimatedArrowIcon({
         {/* Punta — scorre a destra su hover */}
         <motion.path
           d="M 7 3.5 L 12 8 L 7 12.5"
-          stroke={color}
+          style={{ stroke: color }}
           strokeWidth="1.75"
           strokeLinecap="round"
           strokeLinejoin="round"

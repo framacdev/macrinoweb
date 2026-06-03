@@ -2,14 +2,21 @@
  * Percorsi statici poster hero (`public/ribbon-fallback/`).
  * Nessuna API o scan: `<picture>` in `HeroSection` usa solo queste costanti.
  *
- * Breakpoint applicati in HeroSection:
- *   < 576px                                    → sportrait
- *   < 768px  OU  mobile landscape              → tablet
- *   768px – 1024px                             → lgtablet
+ * Breakpoint applicati in HeroSection (prima corrispondenza vince):
+ *   landscape & ≤ 1024px                       → landscape
+ *   < 576px (portrait)                         → sportrait
+ *   < 768px (portrait)                         → tablet
+ *   768px – 1024px (portrait)                  → lgtablet
  *   > 1024px                                   → desktop
  */
 
 const BASE = '/ribbon-fallback' as const
+
+// ── Mobile landscape (orientation landscape & ≤ 1024px) ─────────────────────
+// Poster dedicato ad aspect largo: il tablet quadrato, in cover su un box
+// landscape, risultava zoomato e non combaciava col ribbon live.
+export const HERO_POSTER_LANDSCAPE_WEBP = `${BASE}/herocanvasposter-landscape.webp`
+export const HERO_POSTER_LANDSCAPE_PNG = `${BASE}/herocanvasposter-landscape.png`
 
 // ── Small phone portrait (< 576px) ─────────────────────────────────────────
 export const HERO_POSTER_SPORTRAIT_WEBP = `${BASE}/herocanvasposter-sportrait.webp`

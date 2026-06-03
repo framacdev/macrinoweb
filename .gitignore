@@ -46,6 +46,15 @@ next-env.d.ts
 .claude/
 .roo/
 .clinerules
+.agents/
+skills-lock.json
+
+
+CLAUDE.md
+AGENTS.md
+DESIGN.md
+PRODUCT.md
+.impeccable/
 
 # local scratch / report artifacts (hanno un proprio node_modules)
 /reports/

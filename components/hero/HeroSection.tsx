@@ -10,6 +10,8 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   HERO_POSTER_DESKTOP_PNG,
   HERO_POSTER_DESKTOP_WEBP,
+  HERO_POSTER_LANDSCAPE_PNG,
+  HERO_POSTER_LANDSCAPE_WEBP,
   HERO_POSTER_LGTABLET_PNG,
   HERO_POSTER_LGTABLET_WEBP,
   HERO_POSTER_SPORTRAIT_PNG,
@@ -22,13 +24,14 @@ import { hasWebGL } from '@/lib/hero/hasWebGL'
 import HeroCanvas from './HeroCanvas'
 import HeroContent from './HeroContent'
 
-// WHY: media query del poster di fallback "tablet" — phone portrait ≤ 767px
-// OPPURE phone landscape (orientation + pointer coarse, ≤ 1024px). La stringa
-// landscape vive qui perché, rimossi i preset ribbon per-breakpoint, questo
-// <picture> è il suo unico consumer. La virgola CSS è un OR fra i due casi.
-const MOBILE_LANDSCAPE_MQ =
-  '(orientation: landscape) and (max-width: 1024px) and (pointer: coarse)' as const
-const TABLET_MEDIA = `(max-width: 767px), ${MOBILE_LANDSCAPE_MQ}` as const
+// WHY: media query dei poster di fallback. Il landscape mobile ha ora un poster
+// DEDICATO (aspect largo) invece di riusare quello tablet quadrato, che in cover
+// su un box landscape risultava zoomato e non combaciava col ribbon live. Stessa
+// soglia della media query d'altezza in globals.css (≤1024 + landscape) per
+// coerenza. La source landscape va per prima nel <picture> (prima-corrispondenza).
+const LANDSCAPE_MEDIA =
+  '(orientation: landscape) and (max-width: 1024px)' as const
+const TABLET_MEDIA = '(max-width: 767px)' as const
 
 export default function HeroSection() {
   const [posterHidden, setPosterHidden] = useState(false)
@@ -37,10 +40,9 @@ export default function HeroSection() {
 
   useEffect(() => {
     // WHY: il check WebGL gira dopo il primo RAF (un frame dopo l'hydration)
-    // così il canvas monta solo client-side. L'altezza della hero NON è più
-    // misurata in JS: è pilotata interamente da --hero-h (globals.css), che
-    // sotto i 1024px è un valore fisso in px immune alla URL bar mobile —
-    // più solido del vecchio window.innerHeight, senza flash né listener.
+    // così il canvas monta solo client-side. L'altezza della hero non è misurata
+    // in JS: la section usa min-height:var(--hero-h) e cresce col contenuto; il
+    // canvas (assoluto, inset:0) si adatta sempre all'altezza reale via resize.
     const id = window.requestAnimationFrame(() => {
       setWebglSupported(hasWebGL())
     })
@@ -56,27 +58,52 @@ export default function HeroSection() {
       style={{
         position: 'relative',
         width: '100%',
-        // WHY: altezza pilotata da --hero-h (globals.css): 100dvh su desktop,
-        // 700px portrait / 600px landscape sotto i 1024px. Risolta già a SSR
-        // dalla CSS var → nessun hydration mismatch e nessun flash.
-        height: 'var(--hero-h)',
+        // WHY: min-height (non height) — la hero riempie il viewport quando il
+        // contenuto è corto, ma CRESCE quando il copy supera il viewport (mobile
+        // landscape), così non trabocca mai. 100svh = viewport "piccolo" (URL bar
+        // mostrata): riempie senza il reflow del canvas quando la barra mobile
+        // compare/sparisce. Altezza reale = max(100svh, contenuto in-flow).
+        minHeight: 'var(--hero-h)',
         backgroundColor: 'var(--color-bg)',
-        transition: 'background-color 0.3s ease',
+        // WHY: nessuna transition sul background-color — la section è coperta da
+        // ribbon/wash/canvas, quindi il cambio istantaneo è invisibile. La transition
+        // causava un flash bianco→scuro (300ms animato) in dark mode al page load,
+        // quando il browser calcolava i primi stili PRIMA che next-themes applicasse
+        // .dark e il transition si innescava. html,body in globals.css gestisce la
+        // transizione del background per il resto della pagina.
+        // WHY: isolation:isolate fa della section il contesto di stacking del
+        // blend. Poster, canvas e overlay stanno a z-index:-1; il contenuto è
+        // in-flow (z-auto) e si dipinge sopra. Il mix-blend-mode:multiply del
+        // paragrafo (HeroContent) fonde così col ribbon dietro, dentro questo
+        // contesto isolato e senza propagare il blend al resto della pagina.
+        isolation: 'isolate',
       }}
     >
       {showPoster ? (
         <picture
           style={{
             position: 'absolute',
+            // top:-nav → bleed dietro la navbar; bottom:0 (da inset) → fino al
+            // fondo della section. Niente height:100% (sarebbe over-constrained).
             inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
-            width: '100%',
-            height: '100%',
-            zIndex: 0,
+            zIndex: -1,
             pointerEvents: 'none',
             opacity: posterHidden ? 0 : 1,
             transition: 'opacity 0.55s ease',
           }}
         >
+          {/* ── landscape mobile (≤1024px) — poster dedicato, aspect largo ── */}
+          <source
+            type="image/webp"
+            media={LANDSCAPE_MEDIA}
+            srcSet={HERO_POSTER_LANDSCAPE_WEBP}
+          />
+          <source
+            type="image/png"
+            media={LANDSCAPE_MEDIA}
+            srcSet={HERO_POSTER_LANDSCAPE_PNG}
+          />
+
           {/* ── < 576px — phone portrait piccolo ─────────────────────────── */}
           <source
             type="image/webp"
@@ -89,7 +116,7 @@ export default function HeroSection() {
             srcSet={HERO_POSTER_SPORTRAIT_PNG}
           />
 
-          {/* ── < 768px OU mobile landscape — phone portrait medio + landscape ── */}
+          {/* ── < 768px — phone portrait medio ─────────────────────────── */}
           <source
             type="image/webp"
             media={TABLET_MEDIA}
@@ -132,57 +159,41 @@ export default function HeroSection() {
           />
         </picture>
       ) : null}
-      {/* WHY: isolation:isolate racchiude canvas, overlay e contenuto nello stesso
-          stacking context. Il mix-blend-mode del paragrafo (HeroContent) si fonde
-          coi pixel del ribbon dipinti nello stesso contesto, mentre isolation:isolate
-          confina il blend a questo gruppo senza influenzare il resto della pagina.
-          L'ordine DOM (canvas → overlay → contenuto) definisce l'ordine di pittura
-          senza z-index interni, che creerebbero stacking context isolati e
-          interromperebbero il blend. */}
+      {/* WHY: canvas ribbon a z-index:-1, DOPO il poster nel DOM così, a parità
+          di z, si dipinge sopra di esso (crossfade poster→canvas). Wrapper
+          inset:0 = box della section; il mount del canvas applica da sé il
+          bleed -nav-h, e si estende all'altezza reale della section (cresce col
+          contenuto). */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: -1 }}>
+        {webglSupported === true ? (
+          <HeroCanvas onCanvasReady={onCanvasReady} />
+        ) : null}
+      </div>
+
+      {/* WHY: UNICO overlay di wash. Sfuma il ribbon verso --color-bg in alto a
+          sinistra, staccando badge, H1 e bottoni. z-index:-1 e DOPO il canvas nel
+          DOM → lo tinge; stesso bleed -nav-h di poster e canvas, così sfuma anche
+          dietro l'header (header trasparente a riposo → gradient continuo). */}
       <div
+        aria-hidden
         style={{
           position: 'absolute',
-          inset: 0,
-          zIndex: 1,
-          isolation: 'isolate',
+          inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
+          zIndex: -1,
+          // WHY: gradiente da --hero-wash (globals.css) — default angolo alto-sx,
+          // più esteso in mobile landscape per la leggibilità del copy.
+          background: 'var(--hero-wash)',
+          pointerEvents: 'none',
         }}
-      >
-        {/* WHY: la section ha già la sua altezza --hero-h (CSS) al primo paint,
-            quindi quando HeroCanvasCore legge mount.clientHeight al mount il
-            valore è corretto. Su rotazione il window 'resize' fa rileggere la
-            nuova clientHeight (700↔600) tramite executeResize in HeroCanvasCore. */}
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          {webglSupported === true ? (
-            <HeroCanvas onCanvasReady={onCanvasReady} />
-          ) : null}
-        </div>
+      />
 
-        {/* WHY: UNICO overlay di wash del sito. Sfuma il ribbon verso --color-bg
-            nell'angolo in alto a sinistra, staccando badge, H1 e bottoni. Il
-            bleed di --hero-nav-h (come poster e mount div del canvas) lo fa
-            salire ANCHE dietro l'header: con la card dell'header trasparente a
-            riposo, header e hero condividono questo stesso gradient continuo,
-            senza un secondo overlay da accendere/spegnere. Sta sopra il canvas e
-            sotto tutta la UI (ordine DOM), quindi tinge solo il ribbon. */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            // WHY: stesso inset di poster e mount div del canvas → il wash copre
-            // la fascia dietro la navbar e parte dal vero angolo (0,0) di pagina.
-            inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
-            height: '100%',
-            background:
-              'linear-gradient(to bottom right, var(--color-bg) 0%, transparent 45%)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* Contenuto hero — badge, h1, paragrafo, bottoni */}
-        <div style={{ position: 'absolute', inset: 0 }}>
-          <HeroContent />
-        </div>
-      </div>
+      {/* WHY: contenuto IN-FLOW (z-auto) — dà l'altezza alla section (min-height
+          come floor) e si dipinge SOPRA gli strati a z-index:-1 (nell'ordine di
+          pittura: bg della section → layer z<0 → contenuto in-flow). Niente
+          position/z-index qui: darglielo creerebbe uno stacking context che
+          escluderebbe il ribbon dal backdrop, e il multiply del paragrafo non
+          fonderebbe più. Resta nel contesto isolato della section → fonde. */}
+      <HeroContent />
     </section>
   )
 }

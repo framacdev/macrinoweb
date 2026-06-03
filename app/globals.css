@@ -21,9 +21,14 @@ html {
 /* ── CSS Variables ─────────────────────────────────────────────────────────── */
 
 :root {
+  /* WHY: larghezza massima condivisa da TUTTI i container del sito (header,
+     hero copy, sezioni). Singola sorgente di verità — vedi PRODUCT principio 5.
+     I bordi full-bleed (es. la fascia tech) restano a 100vw; solo il contenuto
+     interno è limitato da questo token. */
+  --container-max: 1300px;
   --color-bg: #fffffe;
   --color-text: #094067;
-  --color-body: #5f6c7b;
+  --color-body: #4a6a94;
   --color-primary: #2273d4;
   --color-primary-hover: #1a5bb8;
   --color-accent: #3da9fc;
@@ -32,37 +37,84 @@ html {
   /* WHY: grigio-blu per il paragrafo hero in light mode con mix-blend-mode:multiply.
      La variante dark usa #fffffe perché multiply su testo chiaro su fondo scuro
      produrrebbe testo invisibile; il colore chiaro senza blend è la scelta corretta. */
-  --color-body-hero: #5c7ca6;
-  --font-heading: var(--font-plus-jakarta), sans-serif;
-  --font-body: var(--font-inter), sans-serif;
+  --color-body-hero: #4a6a94;
+  /* WHY: fallback stringa esplicito — le variabili Next.js (--font-sora,
+     --font-nunito) sono iniettate su <body> via className, non su :root.
+     Senza fallback, DevTools mostra le variabili come non definite su :root
+     e le inline style che usano var(--font-heading) su elementi SSR non
+     hanno un valore valido prima dell'hydration. Con il fallback stringa
+     la variabile è sempre risolvibile a qualsiasi livello del DOM. */
+  /* WHY: colori del primary button e del logo "web" come CSS var anziché valori
+     JS-computati via isDark. next-themes applica .dark a <html> con uno script
+     inline PRIMA dell'hydration di React → le var cambiano immediatamente;
+     i valori JS devono aspettare mounted=true (un rAF) → un frame di flash.
+     Con le var il default (non-hover) del bottone e del logo è corretto già al
+     primo paint, senza attendere React. L'hover resta JS-driven (nessun flash:
+     avviene solo dopo interazione). */
+  --btn-primary-bg: #2273d4;
+  --btn-primary-fg: #fffffe;
+  --logo-web-color: #094067;
+  --hamburger-bg: #e5eeff;
+  --font-heading: var(--font-sora, 'Sora'), system-ui, sans-serif;
+  --font-body: var(--font-nunito, 'Nunito Sans'), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono, 'JetBrains Mono'), monospace;
   /* WHY: altezza della navbar — usata da HeroSection e HeroCanvasCore per
      calcolare il bleed dietro la navbar. Definita in CSS (non in JS) così
      il valore è corretto fin dal primo render SSR, senza flash post-hydration. */
   --hero-nav-h: 76px;
-  /* WHY: altezza della hero, alla maniera di Stripe — pilotata da media query
-     CSS invece che da window.innerHeight in JS. Sul desktop segue il viewport
-     (100dvh), mentre sotto i 1024px diventa un valore FISSO in px (700 portrait,
-     600 landscape): immune alla URL bar mobile che appare/scompare e ai resize
-     verticali, senza flash post-hydration né listener orientationchange. */
-  --hero-h: 100dvh;
+  /* WHY: floor d'altezza della hero, usato come min-height (non height) sulla
+     section. 100svh = small viewport height (URL bar mostrata): la hero riempie
+     sempre almeno lo schermo, ma CRESCE col contenuto in-flow quando questo è più
+     alto. svh evita il reflow del canvas quando la URL bar mobile compare/sparisce.
+     In mobile landscape diventa max(100svh, 580px): un floor che dà proporzione
+     dove il viewport è basso (vedi media query). */
+  --hero-h: 100svh;
+  /* WHY: wash overlay della hero (sfuma il ribbon verso --color-bg sotto il copy).
+     Default: solo l'angolo alto-sx. In mobile landscape diventa più esteso/denso
+     (vedi media query) perché lì il copy occupa quasi tutta la hero e deve poggiare
+     su un'area calma. Variabile così l'overlay (inline in HeroSection) resta una
+     sola sorgente di verità responsiva. */
+  --hero-wash: linear-gradient(
+    to bottom right,
+    var(--color-bg) 0%,
+    transparent 45%
+  );
+  /* WHY: padding ORIZZONTALE condiviso da tutti i container a --container-max
+     (copy hero, carosello, future section). Singola sorgente di verità: la
+     "linea di contenuto" — dove inizia il testo hero e dove spariscono i loghi
+     del carosello — è la stessa a ogni breakpoint. 24px desktop, 16px ≤1024. */
+  --container-pad-x: 24px;
   /* WHY: padding del div copy della hero, anch'esso responsivo via CSS var così
-     resta una singola sorgente di verità condivisa con --hero-nav-h. */
-  --hero-copy-pad: calc(var(--hero-nav-h) + 48px) 24px 24px;
+     resta una singola sorgente di verità condivisa con --hero-nav-h. L'orizzontale
+     arriva da --container-pad-x (vedi sopra). */
+  --hero-copy-pad: calc(var(--hero-nav-h) + 48px) var(--container-pad-x) 24px;
 }
 
 @media (max-width: 1024px) {
   :root {
     --hero-nav-h: 64px;
-    --hero-h: 700px;
-    --hero-copy-pad: calc(var(--hero-nav-h) + 8px) 16px 16px;
+    --container-pad-x: 16px;
+    --hero-copy-pad: calc(var(--hero-nav-h) + 8px) var(--container-pad-x) 16px;
   }
 }
 
-/* WHY: sotto i 1024px in landscape la hero si abbassa a 600px (meno spazio
-   verticale). Segue il blocco max-width:1024px per sovrascriverne il 700px. */
+/* WHY: mobile landscape (≤1024px) — due ritocchi mirati alla leggibilità, dove il
+   viewport basso fa sì che il copy riempia la hero col ribbon interamente dietro:
+   • --hero-h: floor max(100svh, 580px). 580px dà proporzione e una striscia di
+     ribbon pulita dove il viewport è basso; 100svh resta su landscape più alti
+     (tablet). Resta un min-height: il contenuto può crescerla oltre.
+   • --hero-wash: gradiente più esteso/denso → il copy poggia su un'area calmata,
+     mentre il ribbon resta visibile dove non c'è testo.
+   orientation:landscape così il portrait (telefoni/tablet verticali) non è toccato. */
 @media (max-width: 1024px) and (orientation: landscape) {
   :root {
-    --hero-h: 600px;
+    --hero-h: max(100svh, 580px);
+    --hero-wash: linear-gradient(
+      to bottom,
+      var(--color-bg) 0%,
+      color-mix(in srgb, var(--color-bg) 70%, transparent) 46%,
+      transparent 82%
+    );
   }
 }
 
@@ -102,14 +154,76 @@ html {
 
 .dark {
   --color-bg: #0f1e2d;
-  --color-text: #fffffe;
-  --color-body: #5f6c7b;
+  --color-text: #f1f6ff;
+  --color-body: #a7bcd9;
   /* WHY: in light mode i border usano #E5EEFF (celeste chiaro) che su fondo
      scuro sarebbe quasi invisibile. Le versioni semi-trasparenti mantengono
      la stessa tinta ma si adattano al fondo dark senza introdurre nuovi colori. */
   --color-header-border: rgba(229, 238, 255, 0.08);
   --color-menu-item-border: rgba(229, 238, 255, 0.04);
-  --color-body-hero: #fffffe;
+  --color-body-hero: #a7bcd9;
+  --btn-primary-bg: #3da9fc;
+  --btn-primary-fg: #0f1e2d;
+  --logo-web-color: #2273d4;
+  --hamburger-bg: rgba(34, 115, 212, 0.22);
+}
+
+/* ── Header responsive CSS defaults ───────────────────────────────────────── */
+/* WHY: isMobile è stato JS (useState false → true dopo mount) → 1 frame di flash
+   su padding logo, inner card trasparente e border-bottom sbagliato. Stessa
+   strategia di --btn-primary-bg: CSS var impostato correttamente al primo paint,
+   JS sovrascrive solo gli stati dinamici (scroll, menu aperto). */
+:root {
+  /* desktop (non floating, al top) */
+  --header-border: 1px solid var(--color-header-border);
+  --header-card-bg: transparent;
+  --header-card-radius: 2px;
+  --header-card-blur: none;
+  --header-card-pl: 16px;
+  --header-card-shadow: none;
+}
+@media (max-width: 1023px) {
+  :root {
+    /* mobile: sempre floating */
+    --header-border: none;
+    --header-card-bg: rgba(255, 255, 254, 0.88);
+    --header-card-radius: 6px;
+    --header-card-blur: blur(12px);
+    --header-card-pl: 8px;
+    --header-card-shadow: 0 15px 35px rgba(34, 115, 212, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07);
+  }
+}
+
+/* ── Accessibilità: focus + skip-link ────────────────────────────────────────── */
+
+/* Focus da tastiera visibile su TUTTO l'interattivo. :focus-visible scatta solo
+   da tastiera (non al click del mouse), così non sporca l'hover col puntatore.
+   L'outline segue il border-radius dell'elemento sui browser moderni. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Skip-link: fuori schermo finché non riceve focus, poi scende in alto a sx.
+   z 100 = sopra header (50) e tooltip (60). */
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-150%);
+  padding: 10px 16px;
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  font-family: var(--font-body);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -130,43 +244,41 @@ body {
 
 /* ── Headings ──────────────────────────────────────────────────────────────── */
 
-/*
- * Tutti gli heading usano Plus Jakarta Sans e il colore --color-text.
- * In dark mode --color-text diventa #FFFFFE automaticamente
- * grazie alla CSS variable definita in .dark.
- */
-
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-plus-jakarta), sans-serif;
+  /* WHY: riferimento diretto alla variabile Next.js — stesso pattern
+     dell'originale (var(--font-plus-jakarta)), garantisce che il font
+     sia disponibile su tutti gli heading anche prima che --font-heading
+     venga risolto in cascata da :root. */
+  font-family: var(--font-sora), system-ui, sans-serif;
   color: var(--color-text);
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 h1 {
-  font-size: clamp(2rem, 5vw, 3.111rem); /* ~56px a base 18px */
+  font-size: clamp(2.222rem, 5.5vw, 3.333rem); /* 40px mobile → 60px desktop */
   font-weight: 800;
 }
 
 h2 {
-  font-size: clamp(1.5rem, 4vw, 2rem); /* ~36px */
+  font-size: clamp(1.667rem, 4.5vw, 2.222rem); /* 30px → 40px */
   font-weight: 700;
 }
 
 h3 {
-  font-size: clamp(1.25rem, 3vw, 1.333rem); /* ~24px */
+  font-size: clamp(1.333rem, 3vw, 1.556rem); /* 24px → 28px */
   font-weight: 600;
 }
 
 h4,
 h5,
 h6 {
-  font-size: clamp(1rem, 2.5vw, 1.111rem); /* ~20px */
+  font-size: clamp(1.111rem, 2.5vw, 1.333rem); /* 20px → 24px (mobile era = body, ora gerarchia corretta) */
   font-weight: 500;
 }
 
@@ -180,8 +292,264 @@ h6 {
 
 button {
   font-family: var(--font-body);
-  font-size: 1rem; /* 18px base — i componenti sovrascrivono se serve */
+  font-size: clamp(1rem, 2.5vw, 1.111rem); /* 18px mobile → 20px desktop */
   font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
+}
+
+/* ── Tech Marquee ──────────────────────────────────────────────────────────── */
+/* WHY: carosello loghi sotto la hero. Fascia full-bleed (border-top + bottom
+   edge-to-edge nello stesso token tema-adattivo dell'header), con la SOLA track
+   interna limitata a --container-max. Animazione 100% CSS (nessun JS, nessun
+   timer) così il componente resta un Server Component: SOLID + performance.
+   Il loop è infinito e senza giunture perché la track contiene DUE gruppi
+   identici e trasla di -50% (= esattamente la larghezza di un gruppo). */
+:root {
+  /* altezza fascia = altezza dell'header OUTER (non la card interna), misurata
+     in-browser: 75px su desktop (≥1024 = breakpoint lg che mostra CTA+nav),
+     64px sotto (header in versione mobile con hamburger). NB: la dimensione dei
+     loghi NON cambia l'altezza della fascia (fissa), solo il riempimento. */
+  --marquee-h: 75px;
+  /* gap ampio: con loghi a 38px fa vedere ~3-4 marchi in meno per riga */
+  --marquee-gap: clamp(4.2rem, 10vw, 6.2rem);
+  --marquee-logo-h: 46px;
+  /* andatura calma: durata di un giro completo (più alto = più lento). Allungata
+     da 60s perché il gruppo è più largo (gap maggiore) → stessa velocità in px/s. */
+  --marquee-duration: 74s;
+}
+/* WHY: 1023.98px = confine lg di Tailwind (1024px) — sotto, l'header passa alla
+   card mobile da 64px, quindi la fascia segue. Soglia esclusiva per non lasciare
+   scoperta la larghezza esatta di 1024. */
+@media (max-width: 1023.98px) {
+  :root {
+    --marquee-h: 64px;
+    --marquee-logo-h: 44px;
+  }
+}
+
+.marquee {
+  position: relative; /* àncora per le righe ::before/::after. NB: relative NON
+                         crea containing block per il tooltip position:fixed. */
+  width: 100%;
+  height: var(--marquee-h);
+  /* offset per l'eventuale ancora in-page sotto l'header sticky */
+  scroll-margin-top: 100px;
+  background-color: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* WHY: righe di bordo come pseudo-elementi su LAYER GPU proprio, non come
+   `border` su .marquee. Il bordo 1px #e5eeff su bianco (contrasto ~1.06:1) è
+   talmente tenue che, quando il canvas WebGL della hero attiva la rasterizzazione
+   GPU dell'intera pagina (~1s su mobile), l'anti-aliasing sub-pixel lo media nel
+   bianco fino a farlo sparire. translateZ(0) forza ogni riga su un layer dedicato
+   → si rasterizza nitida e non viene più "schiarita". I pseudo non sono antenati
+   del tooltip, quindi il translate non ne rompe il position:fixed.
+   Stesso token dell'header (#e5eeff light / 8% in dark), full-bleed (left/right:0). */
+.marquee::before,
+.marquee::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: .5px;
+  background-color: var(--color-header-border);
+  pointer-events: none;
+  transform: translateZ(0);
+}
+.marquee::before {
+  top: 0;
+}
+.marquee::after {
+  bottom: 0;
+}
+
+/* container a --container-max con lo STESSO padding orizzontale del copy hero:
+   la "linea di contenuto" coincide. Non ritaglia: il clip è il figlio. */
+.marquee__viewport {
+  width: 100%;
+  max-width: var(--container-max);
+  height: 100%;
+  margin-inline: auto;
+  padding-inline: var(--container-pad-x);
+  display: flex;
+  align-items: center;
+}
+
+/* WHY: il clip riempie il SOLO content-box (1300 - 2×padding), quindi i loghi
+   spariscono esattamente sulla linea del padding = colonna del testo hero, non
+   dietro il margin. La maschera fa la dissolvenza morbida che si completa proprio
+   su quella linea (transparent agli estremi del content-box). min-width:0 è
+   necessario perché un flex-item con overflow possa restringersi. */
+.marquee__clip {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  /* stretch → track/group/item riempiono tutta l'altezza della fascia */
+  align-items: stretch;
+  /* drag-and-pull: l'intera fascia è afferrabile */
+  cursor: grab;
+  /* touch: il pan VERTICALE resta nativo (scroll pagina), l'ORIZZONTALE va ai
+     Pointer Events del drag → niente conflitto tra scroll pagina e trascinamento */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 8%,
+    #000 92%,
+    transparent
+  );
+}
+
+.marquee__track {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+  /* WHY: NESSUN gap sulla track. Il distacco tra i due gruppi è dato dal
+     padding-inline degli item → la track è perfettamente periodica (larghezza =
+     2× la "cella" gruppo). Lo scorrimento è guidato da JS (TechMarquee): il
+     transform avvolge `pos` modulo larghezza-gruppo → loop infinito senza
+     giunture. --marquee-duration resta la single source della velocità (letta dal JS). */
+  /* WHY: solo transform → GPU, nessun reflow/repaint. Nessuna animazione CSS qui:
+     il transform è impostato da rAF/drag. La pausa-hover è gestita in JS. */
+  will-change: transform;
+}
+
+/* grabbing mentre si trascina */
+.marquee.is-dragging .marquee__clip {
+  cursor: grabbing;
+}
+
+.marquee__group {
+  display: flex;
+  flex-wrap: nowrap;
+  /* stretch → gli item riempiono tutta l'altezza della fascia */
+  align-items: stretch;
+  /* il gruppo è un <ul> — azzera lo stile lista */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* WHY: NIENTE gap qui. La spaziatura tra i loghi è il padding-inline degli item
+     (gap/2 per lato): così i BLOCCHI sono contigui (nessuno spazio morto). La
+     giuntura g1→g2 = pad-dx (gap/2) + pad-sx (gap/2) = gap, identica allo spazio
+     interno → track periodica, translateX(-50%) senza scatti. */
+}
+
+.marquee__item {
+  /* BLOCCO a piena copertura: tutta l'altezza della fascia + larghezza fino a
+     metà strada verso i vicini (padding gap/2 per lato). L'area hover riempie
+     tutto lo spazio → lo spotlight parte appena il cursore entra nel carosello,
+     perché è sempre sopra il blocco di un logo. Il logo resta centrato. */
+  height: 100%;
+  padding-inline: calc(var(--marquee-gap) / 2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* WHY: spotlight sul logo a fuoco. Lo stato è guidato da JS (TechMarquee), NON da
+   CSS :hover — così funziona anche su TOUCH (dove :hover è inaffidabile/sticky):
+   la section ha `.is-focusing` quando un logo è attivo, e quel logo ha `.is-active`.
+   Gli ALTRI (`:not(.is-active)`) vengono desaturati e tinti di #5c7ca6 (filtro SVG
+   #marquee-mute-slate); il filtro MANTIENE i dettagli interni (lettere JS/TS/Ai…),
+   che un riempimento piatto nasconderebbe. Attivo anche DURANTE il drag: il JS
+   aggiorna .is-active sul logo sotto il cursore mentre si trascina. */
+.marquee.is-focusing .marquee__item:not(.is-active) svg {
+  filter: url(#marquee-mute-slate);
+  opacity: 0.5;
+}
+
+.marquee__item svg {
+  height: var(--marquee-logo-h);
+  width: auto;
+  /* cap per i marchi più larghi, così nessun logo domina la fascia. Con width+
+     height entrambi vincolati, l'SVG scala via preserveAspectRatio (no distorsione). */
+  max-width: 100px;
+  /* dissolvenza morbida del mute (grayscale + opacity) all'hover dei vicini */
+  transition:
+    filter 0.25s ease,
+    opacity 0.25s ease;
+  /* WHY: NIENTE `display:block` qui — `.marquee__item svg` (specificità 0,1,1)
+     batterebbe le utility Tailwind `.hidden`/`dark:hidden` (0,1,0), tenendo
+     visibili ENTRAMBE le varianti tema (Next.js, Cursor, Illustrator). L'svg è
+     già flex item del <li>, quindi l'altezza si applica comunque. */
+}
+
+/* ── Tooltip al passaggio sul logo ───────────────────────────────────────── */
+/* WHY: position:fixed → il tooltip ESCE dal clip (.marquee/.marquee__viewport
+   hanno overflow:hidden, che taglierebbe un tooltip in absolute). Le coordinate
+   arrivano dal getBoundingClientRect del logo (calcolate in TechMarquee). La
+   superficie è tema-adattiva via color-mix sui token esistenti: un gradino di
+   elevazione sul bg sia in light sia in dark, senza introdurre nuovi colori. */
+.marquee__tip {
+  position: fixed;
+  z-index: 60; /* sopra l'header sticky (z-50) */
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-bg), var(--color-text) 6%);
+  border: 1px solid color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
+  color: var(--color-text);
+  box-shadow: 0 4px 14px rgba(9, 64, 103, 0.14);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: marquee-tip-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* freccetta verso il basso (quadrato ruotato con i due lati visibili bordati) */
+.marquee__tip-arrow {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  background: color-mix(in srgb, var(--color-bg), var(--color-text) 6%);
+  border-right: 1px solid color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+@keyframes marquee-tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 4px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 10px));
+  }
+}
+
+/* WHY: reduced motion — niente scorrimento AUTOMATICO (gestito in JS: l'rAF non
+   avanza). La fascia resta comunque TRASCINABILE col drag (manipolazione diretta
+   dell'utente, non un'animazione). Qui solo i micro-dettagli resi istantanei. */
+@media (prefers-reduced-motion: reduce) {
+  /* il tooltip compare istantaneo, senza fade+scale */
+  .marquee__tip {
+    animation: none;
+  }
+  /* mute dei loghi senza dissolvenza */
+  .marquee__item svg {
+    transition: none;
+  }
 }

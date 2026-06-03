@@ -1,33 +1,59 @@
 import type { Metadata } from 'next'
-import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
+import { Sora, Nunito_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import Header from '@/components/layout/Header'
 import LevaGate from '@/components/ui/LevaGate'
+import { SITE_URL, SITE_TITLE, SITE_DESCRIPTION } from '@/lib/site'
 
-// Variable fonts: Next.js loads a single .woff2 covering the full weight range.
-// Omitting `weight` opts into the variable font — no per-weight preload files.
-const inter = Inter({
-  variable: '--font-inter',
+const sora = Sora({
+  variable: '--font-sora',
   subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
   display: 'swap',
 })
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: '--font-plus-jakarta',
+const nunitoSans = Nunito_Sans({
+  variable: '--font-nunito',
   subsets: ['latin'],
+  weight: ['400', '500', '600'],
   display: 'swap',
 })
 
-const SITE_URL = 'https://macrinoweb.com'
-const SITE_TITLE = 'Francesco Macrino — Web Developer'
-const SITE_DESCRIPTION =
-  'Web Developer con focus su qualità, performance e risultati concreti. Trasformo idee e problemi complessi in soluzioni digitali efficaci.'
+const jetbrainsMono = JetBrains_Mono({
+  variable: '--font-jetbrains-mono',
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
+})
+
+// JSON-LD Person: dà a Google/AI un'entità strutturata su chi è Francesco e
+// cosa sa fare. knowsAbout elenca lo stack reale mostrato nel marquee.
+const personJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Francesco Macrino',
+  jobTitle: 'Web Developer',
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  knowsAbout: [
+    'Frontend Development',
+    'React',
+    'Next.js',
+    'TypeScript',
+    'Three.js',
+    'Web Performance',
+    'Web Accessibility',
+  ],
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: 'it_IT',
@@ -73,9 +99,19 @@ export default function RootLayout({
     <html lang="it" suppressHydrationWarning data-scroll-behavior="smooth">
       <body
         suppressHydrationWarning
-        className={`${inter.variable} ${plusJakartaSans.variable} antialiased min-h-screen`}
+        className={`${sora.variable} ${nunitoSans.variable} ${jetbrainsMono.variable} antialiased min-h-screen`}
       >
+        {/* JSON-LD Person — entità strutturata per motori di ricerca e AI. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(personJsonLd) }}
+        />
         <ThemeProvider>
+          {/* Skip-link: prima voce in tab order, salta header e hero diretto al
+              contenuto. Invisibile finché non riceve focus da tastiera. */}
+          <a href="#contenuto" className="skip-link">
+            Vai al contenuto
+          </a>
           <LevaGate />
           <Header />
           {children}

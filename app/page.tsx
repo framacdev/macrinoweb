@@ -6,15 +6,21 @@
  * nel modulo `HeroCanvas.tsx` così Three resta solo client.
  */
 
+import dynamic from 'next/dynamic'
+
 import HeroSection from '@/components/hero/HeroSection'
+
+// TechMarquee è sotto la piega e tutto client-side (23 SVG inline + pointer
+// handlers): lo splittiamo in un chunk a parte così non pesa sul JS iniziale.
+// SSR resta attivo (nessun ssr:false) → HTML presente, niente pop-in né perdita
+// SEO degli aria-label dei loghi.
+const TechMarquee = dynamic(() => import('@/components/sections/TechMarquee'))
 
 export default function HomePage() {
   return (
-    <main>
-      {/* sr-only: testo accessibile ma invisibile — garantisce che Plus Jakarta Sans
-          venga applicato a testo reale, eliminando il warning 'preloaded but not used'. */}
-      <h1 className="sr-only">Francesco Macrino — Web Developer</h1>
+    <main id="contenuto" tabIndex={-1}>
       <HeroSection />
+      <TechMarquee />
       {/*
        * Le sezioni successive (Servizi, Portfolio, ecc.) andranno qui.
        * Avranno position:relative normale (non fixed/absolute come la hero),

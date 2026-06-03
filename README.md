@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# macrinoweb
 
-## Getting Started
+Portfolio personale di **Francesco Macrino**, Web Developer — [macrinoweb.com](https://macrinoweb.com).
 
-First, run the development server:
+Il sito è esso stesso il campione di lavoro: l'hero è un ribbon WebGL (Three.js)
+che scorre sopra un sistema visivo calmo e theme-adaptive ("Still Surface, Deep
+Current"). Il design è il prodotto.
+
+## Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript** strict
+- **Three.js** + @react-three/fiber + @react-three/postprocessing (hero ribbon)
+- **Framer Motion** (animazioni UI)
+- **Tailwind CSS 4** (layout/responsività) + inline style objects (logica complessa)
+- **next-themes** (dark/light, class-based)
+- **sharp** (ottimizzazione immagini, generazione OG)
+
+## Sviluppo
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # build di produzione
+npm run lint       # eslint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Script
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run hero:texture                    # assets/textures/ribbon3.png → public .webp
+node scripts/generate-og-image.mjs      # rigenera public/og-image.png (1200×630)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`/ribbon-capture` (solo in dev) cattura i poster del ribbon ai vari breakpoint.
 
-## Learn More
+## Struttura
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/            route App Router + metadata (robots, sitemap, layout, JSON-LD)
+components/     hero (canvas WebGL), layout (header), sezioni, ui
+lib/            costanti runtime, metadati sito, config hero (shader, qualità, controlli)
+public/         poster del ribbon, texture, og-image
+scripts/        ottimizzazione texture, generazione OG
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Vercel. Lingua del sito: italiano.

@@ -79,10 +79,10 @@ function CTAButton({
         padding: '10px 28px',
         borderRadius: '4px',
         cursor: 'pointer',
-        fontFamily: 'var(--font-inter)',
+        fontFamily: 'var(--font-body)',
         fontWeight: '600',
         letterSpacing: '0.02em',
-        fontSize: '16px',
+        fontSize: 16, 
         whiteSpace: 'nowrap',
         textDecoration: 'none',
         ...primaryButtonStyle({ isDark, isHovered, withHalo: false }),
@@ -91,85 +91,25 @@ function CTAButton({
       Contattami
       <AnimatedArrowIcon
         isHovered={isHovered}
-        color={primaryButtonForeground(isDark)}
+        color={primaryButtonForeground()}
       />
     </Link>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HamburgerIcon
+// HamburgerIcon — pattern "Spin" di hamburgers.css (Jonathan Suh) replicato con
+// tre <motion.span> invece di pseudo-elementi. Le animazioni partono tutte
+// insieme: l'occhio vede le barre avvitarsi fluidamente in una X.
 //
-// PRINCIPIO CHIAVE: tutto avviene SIMULTANEAMENTE, non sequenzialmente.
-// Convergenza (y) e rotazione partono allo stesso istante e finiscono allo
-// stesso istante. L'effetto visivo "barra unica → X" è un'illusione generata
-// dal movimento parallelo: l'occhio vede le barre che si avvitano fluidamente,
-// e in qualche frame intermedio sembrano sovrapporsi creando la barra unica.
+// L'originale usa ::after figlio della centrale, che ne eredita la rotazione
+// (225° del parent − 90° = 135°). Con tre sibling indipendenti "linearizzo":
+// centrale 0°→225°, bottom 0°→135°. Entrambe orarie (Spin, non Vortex).
 //
-// Apertura (3 barre → X):
-//   - top: y da 0 a +SHIFT_Y, opacity da 1 a 0
-//   - middle: rotate da 0° a 225°
-//   - bottom: y da 0 a -SHIFT_Y, rotate da 0° a -225°
-//   Tutte queste animazioni partono insieme con la stessa cubic-bezier.
-//
-// Chiusura (X → 3 barre): tutti i valori tornano a 0 simultaneamente,
-// con la stessa identica curva di easing. La sensazione è di "svitamento".
-//
-// PERCHÉ ±225° E NON ±45°:
-// Posizioni finali geometricamente identiche (mod 360°), ma il percorso
-// animato è 5x più lungo. È mezzo giro completo + 45° finali — quello che
-// genera la sensazione di vortice invece di un semplice "splay".
-//
-// EASING:
-// cubic-bezier(0.215, 0.61, 0.355, 1) — ease-out cubico estratto dai CSS
-// originali Breakdance. Parte snappy, decelera dolcemente alla fine.
-// ─────────────────────────────────────────────────────────────────────────────
+// I 225° invece di 45°: stessa posizione finale (mod 360°) ma percorso 5× più
+// lungo → sensazione di vortice. Easing asimmetrico apertura/chiusura (ease-out
+// vs ease-in cubico) per un movimento organico, non meccanico.
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HamburgerIcon — replica esatta del pattern "Spin" di hamburgers.css
-// (Jonathan Suh, https://jonsuh.com/hamburgers/)
-//
-// COMPORTAMENTO ORIGINALE:
-// Tre elementi (.hamburger-inner + ::before + ::after) dove ::after è figlio
-// di .hamburger-inner e quindi eredita la sua rotazione. Quando la centrale
-// ruota di 225° e ::after di -90° (rispetto al parent), la composizione
-// finale è 225 - 90 = 135° → la X è formata dalla centrale a 225° e dalla
-// bottom a 135°.
-//
-// REPLICA CON SIBLINGS (NO PSEUDO-ELEMENTI):
-// Avendo tre <motion.span> indipendenti devo "linearizzare" la matematica:
-// • centrale: rotate 0° → 225° (identico)
-// • bottom: rotate 0° → 135° (= 225° + (-90°), già composto)
-// Le due rotazioni vanno entrambe in senso orario (positivo): è il pattern
-// "Spin", non "Vortex" (vortex userebbe rotazioni opposte).
-//
-// SEQUENZA APERTURA (hamburger → X):
-//   0ms ────────── 100ms ── 120ms ───────────────── 340ms
-//   [top scende ][svanisce  ]                        |
-//   [bot sale  ][delay      ][rotazione a 135°       ]
-//                  [delay   ][rotazione cent. a 225°]
-//
-// Effetto visivo: prima convergenza (le 3 barre si sovrappongono creando
-// l'illusione della "barra unica"), poi rotazione simultanea che apre la X.
-//
-// SEQUENZA CHIUSURA (X → hamburger):
-//   0ms ──────────────── 220ms ── 250ms ──── 350ms
-//   [opacity top a 1   ]
-//   [rotazione cent. a 0]                    |
-//   [rotazione bot a 0  ][delay  ][bot giù  ]
-//                        [delay  ][top su   ]
-//
-// Effetto visivo: prima la X "si svita" tornando barra unica, poi le barre
-// si separano tornando alle posizioni originali.
-//
-// CUBIC-BEZIER:
-// • Apertura → cubic-bezier(0.215, 0.61, 0.355, 1) [ease-out cubico]
-// • Chiusura → cubic-bezier(0.55, 0.055, 0.675, 0.19) [ease-in cubico]
-// L'asimmetria delle curve è ciò che rende la rotazione percettivamente
-// "organica" e non meccanica.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function HamburgerIcon({ isOpen }: { isOpen: boolean }) {
+function HamburgerIcon({ isOpen, isDark }: { isOpen: boolean; isDark: boolean }) {
   // Distanza centro-centro tra due barre adiacenti.
   // height 1.5px + gap 4px → 1.5/2 + 4 + 1.5/2 = 5.5px
   const SHIFT_Y = 5.5
@@ -182,7 +122,11 @@ function HamburgerIcon({ isOpen }: { isOpen: boolean }) {
     display: 'block',
     width: '16px',
     height: '1.5px',
-    backgroundColor: C.primary,
+    // WHY: il nav card è near-white quando il menu è chiuso (anche in dark mode)
+    // e navy solido quando è aperto. Le barre seguono il contrasto del fondo:
+    // • menu open in dark → navy #0f1e2d → accent ciano (alto contrasto)
+    // • tutti gli altri stati → card chiaro/bianco → primary blu (4.74:1 sul bianco)
+    backgroundColor: isDark && isOpen ? C.accent : C.primary,
     borderRadius: '2px',
     transformOrigin: 'center',
   }
@@ -274,7 +218,6 @@ function MobileMenu({
   menuBg,
   theme,
   toggleTheme,
-  mounted,
 }: {
   headerHeight: number
   onClose: () => void
@@ -282,7 +225,6 @@ function MobileMenu({
   menuBg: string
   theme: string | undefined
   toggleTheme: () => void
-  mounted: boolean
 }) {
   const textColor = isDark ? C.textDark : C.text
   const pathname = usePathname()
@@ -362,7 +304,7 @@ function MobileMenu({
                 padding: '20px 16px',
                 color: textColor,
                 fontSize: '16px',
-                fontFamily: 'var(--font-inter)',
+                fontFamily: 'var(--font-body)',
                 fontWeight: '500',
                 letterSpacing: '-0.02em',
                 textDecoration: 'none',
@@ -425,8 +367,9 @@ function MobileMenu({
               setTimeout(() => setIsPressed(false), 300)
               toggleTheme()
             }}
+            suppressHydrationWarning
             aria-label={
-              mounted && theme === 'dark'
+              theme === 'dark'
                 ? 'Passa alla modalità chiara'
                 : 'Passa alla modalità scura'
             }
@@ -448,11 +391,11 @@ function MobileMenu({
                 'color 0.3s ease-in-out, border-color 0.3s ease-in-out',
             }}
           >
-            {mounted && theme === 'dark' ? (
-              <Sun size={18} />
-            ) : (
-              <Moon size={18} />
-            )}
+            {/* WHY: entrambe le icone nel DOM — CSS le mostra/nasconde via
+                .dark su <html> (applicato da next-themes prima di React).
+                Nessun conditional rendering → nessun hydration mismatch. */}
+            <Moon size={18} className="block dark:hidden" />
+            <Sun size={18} className="hidden dark:block" />
           </button>
         </div>
       </div>
@@ -556,15 +499,14 @@ export default function Header() {
   const isDark = mounted && theme === 'dark'
 
   // Sfondo della card interna:
-  // - Non floating: TRASPARENTE → lascia passare il wash UNICO della HeroSection
-  //   (overlay del ribbon, con bleed dietro l'header), così header e hero sono
-  //   un solo gradient continuo e non c'è un fondo che copra il ribbon
-  // - Floating in dark mode con menu aperto: dark navy solido
-  // - Floating altrimenti: bianco semi-trasparente per il blur effect
+  // - desktop non floating: var(--header-card-bg) = transparent (CSS)
+  // - mobile (sempre floating): var(--header-card-bg) = rgba bianco (CSS)
+  // - desktop floating (dopo scroll): rgba bianco (JS override)
+  // - dark mode + menu aperto: navy solido (JS override, solo dopo interazione)
   const innerCardBg = (() => {
-    if (!isFloating) return 'transparent'
     if (isDark && isMenuOpen) return '#0f1e2d'
-    return 'rgba(255, 255, 254, 0.88)'
+    if (isDesktopFloating) return 'rgba(255, 255, 254, 0.88)'
+    return 'var(--header-card-bg)'
   })()
 
   // Colore del testo per nav e logo:
@@ -591,12 +533,11 @@ export default function Header() {
           // anche dietro la navbar. Nessun position inline: lo `sticky` del
           // className non va sovrascritto.
           background: 'transparent',
-          borderBottom:
-            !isFloating && !isMobile
-              ? `1px solid ${
-                  isDark ? 'rgba(229, 238, 255, 0.1)' : C.headerBorder
-                }`
-              : 'none',
+          // WHY: var(--header-border) = 1px solid var(--color-header-border)
+          // su desktop, none su mobile — corretto dal primo paint via CSS.
+          // var(--color-header-border) cambia già con .dark (next-themes).
+          // JS sovrascrive solo quando desktop va in floating (dopo scroll).
+          borderBottom: isDesktopFloating ? 'none' : 'var(--header-border)',
           transition: 'border-color 0.3s ease',
         }}
       >
@@ -606,26 +547,42 @@ export default function Header() {
             card trasparente a riposo (innerCardBg), header e hero mostrano lo
             stesso identico gradient: niente secondo layer da sincronizzare. */}
         {/* Container max-width — "il container dell'header" */}
-        <div style={{ maxWidth: '1300px', margin: '0 auto', padding: '8px' }}>
+        <div
+          style={{
+            maxWidth: 'var(--container-max)',
+            margin: '0 auto',
+            padding: '8px',
+          }}
+        >
           {/* Card interna — "l'header vero e proprio" — quella che fluttua */}
           <motion.nav
             className="flex items-center justify-between"
             style={{
               paddingTop: '6px',
               paddingBottom: '6px',
-              paddingLeft: !isMobile ? '16px' : '8px',
+              // WHY: var(--header-card-pl) = 8px su mobile, 16px su desktop —
+              // corretto dal primo paint, nessun flash da isMobile=false.
+              paddingLeft: 'var(--header-card-pl)',
               paddingRight: '8px',
 
-              borderRadius: isFloating ? '6px' : '2px',
+              // WHY: var(--header-card-radius/blur) = valori mobile dal CSS,
+              // overridati da JS solo quando desktop va in floating.
+              borderRadius: isDesktopFloating ? '6px' : 'var(--header-card-radius)',
               backgroundColor: innerCardBg,
-              backdropFilter: isFloating ? 'blur(12px)' : 'none',
-              WebkitBackdropFilter: isFloating ? 'blur(12px)' : 'none',
+              backdropFilter: isDesktopFloating ? 'blur(12px)' : 'var(--header-card-blur)',
+              WebkitBackdropFilter: isDesktopFloating ? 'blur(12px)' : 'var(--header-card-blur)',
+              // WHY: var(--header-card-shadow) = shadow su mobile dal CSS,
+              // none su desktop. JS sovrascrive per menu-open e desktop-floating.
+              boxShadow: isMenuOpen
+                ? 'none'
+                : isDesktopFloating
+                  ? C.floatingShadow
+                  : 'var(--header-card-shadow)',
               transition:
                 'background-color 0.3s ease, box-shadow 0.3s ease, border-radius 0.3s ease',
             }}
             animate={{
               marginTop: isDesktopFloating ? 10 : 0,
-              boxShadow: isFloating && !isMenuOpen ? C.floatingShadow : 'none',
             }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
           >
@@ -666,7 +623,7 @@ export default function Header() {
                         isHoveringNav && hoveredNav !== item.href ? 0.5 : 1,
                       padding: '8px 20px',
                       fontSize: '16px',
-                      fontFamily: 'var(--font-inter)',
+                      fontFamily: 'var(--font-body)',
                       fontWeight: '500',
                       letterSpacing: '-0.02em',
                       textDecoration: 'none',
@@ -687,8 +644,9 @@ export default function Header() {
               <button
                 onClick={toggleTheme}
                 className="hidden lg:flex items-center justify-center"
+                suppressHydrationWarning
                 aria-label={
-                  mounted && theme === 'dark'
+                  theme === 'dark'
                     ? 'Passa alla modalità chiara'
                     : 'Passa alla modalità scura'
                 }
@@ -710,14 +668,11 @@ export default function Header() {
                   e.currentTarget.style.color = textColor
                 }}
               >
-                {/* mounted check: evita mismatch hydration.
-                    Il server non conosce il tema → mostra sempre Moon.
-                    Il client, dopo il mount, mostra l'icona corretta. */}
-                {mounted && theme === 'dark' ? (
-                  <Sun size={20} />
-                ) : (
-                  <Moon size={20} />
-                )}
+                {/* WHY: entrambe le icone nel DOM — CSS le mostra/nasconde via
+                    .dark su <html> (applicato da next-themes prima di React).
+                    Nessun conditional rendering → nessun hydration mismatch. */}
+                <Moon size={20} className="block dark:hidden" />
+                <Sun size={20} className="hidden dark:block" />
               </button>
 
               {/* CTA Contattami — solo desktop */}
@@ -732,7 +687,11 @@ export default function Header() {
                   aria-label={isMenuOpen ? 'Chiudi menu' : 'Apri menu'}
                   aria-expanded={isMenuOpen}
                   style={{
-                    backgroundColor: C.hamburgerBg,
+                    // WHY: var(--hamburger-bg) = #e5eeff light, rgba(34,115,212,0.22)
+                    // dark — applicato dal CSS prima di React (next-themes).
+                    // Il dark usa tinta primary al 22%: visibile sia sul navy solido
+                    // (menu open) che sulla nav glass (rgba bianco).
+                    backgroundColor: 'var(--hamburger-bg)',
                     borderRadius: '4px',
                     border: 'none',
                     cursor: 'pointer',
@@ -744,7 +703,7 @@ export default function Header() {
                     flexShrink: 0,
                   }}
                 >
-                  <HamburgerIcon isOpen={isMenuOpen} />
+                  <HamburgerIcon isOpen={isMenuOpen} isDark={isDark} />
                 </button>
               </div>
             </div>
@@ -768,7 +727,6 @@ export default function Header() {
             menuBg={innerCardBg}
             theme={theme}
             toggleTheme={toggleTheme}
-            mounted={mounted}
           />
         )}
       </AnimatePresence>

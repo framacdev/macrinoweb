@@ -13,7 +13,10 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js'
 
 import type { HeroRibbonControls } from '@/lib/hero/heroControlDefaults'
-import { resolveHeroCanvasQuality } from '@/lib/hero/heroCanvasQuality'
+import {
+  resolveHeroCanvasQuality,
+  HERO_CAPTURE_QUALITY,
+} from '@/lib/hero/heroCanvasQuality'
 import { heroRibbonRadialBlurShader } from '@/lib/hero/heroRibbonRadialBlur'
 import {
   heroRibbonFragmentShader,
@@ -33,11 +36,18 @@ export type HeroCanvasProps = {
 
 export type HeroCanvasCoreProps = HeroCanvasProps & {
   ctrlRef: React.RefObject<HeroRibbonControls>
+  /**
+   * Modalità cattura (route `/ribbon-capture`): preserveDrawingBuffer attivo,
+   * frame congelato a t=0, nessun offset navbar (il canvas == box del poster),
+   * qualità massima a pixelRatio 1. Solo per generare i poster, mai in prod.
+   */
+  captureMode?: boolean
 }
 
 export function HeroCanvasCore({
   ctrlRef,
   onCanvasReady,
+  captureMode = false,
 }: HeroCanvasCoreProps) {
   const mountRef = useRef<HTMLDivElement>(null)
   const onCanvasReadyRef = useRef(onCanvasReady)
@@ -49,7 +59,16 @@ export function HeroCanvasCore({
     if (!mountRef.current) return
     const mount = mountRef.current
 
-    const quality = resolveHeroCanvasQuality()
+    // prefers-reduced-motion: ribbon congelato su un singolo frame (t=0) —
+    // zero costo CPU/GPU a riposo e nessun movimento full-screen (a11y).
+    // captureMode (route /ribbon-capture) usa lo stesso freeze.
+    const reduceMotion =
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    const freeze = captureMode || reduceMotion
+
+    const quality = captureMode
+      ? HERO_CAPTURE_QUALITY
+      : resolveHeroCanvasQuality()
 
     // WHY: la larghezza minima è imposta in JS, NON via CSS min-width.
     // Un min-width CSS su un elemento position:absolute espande il document
@@ -72,9 +91,17 @@ export function HeroCanvasCore({
       antialias: true,
       alpha: true,
       powerPreference: 'high-performance',
+      // preserveDrawingBuffer solo in cattura: serve a canvas.toBlob() per
+      // leggere il frame. In produzione resta false (nessun costo di memoria).
+      preserveDrawingBuffer: captureMode,
     })
-    const pixelRatio = Math.min(window.devicePixelRatio, quality.pixelRatioCap)
-    renderer.setPixelRatio(pixelRatio)
+    // currentPixelRatio è mutabile: il governor adattivo (vedi tick) può
+    // abbassarlo a 1 se il frame time reale supera la soglia.
+    let currentPixelRatio = Math.min(
+      window.devicePixelRatio,
+      quality.pixelRatioCap
+    )
+    renderer.setPixelRatio(currentPixelRatio)
     renderer.setSize(initW, mount.clientHeight)
     renderer.setClearColor(0x000000, 0)
     mount.appendChild(renderer.domElement)
@@ -95,18 +122,25 @@ export function HeroCanvasCore({
     }
 
     const texture = new THREE.TextureLoader().load(
-      '/textures/ribbon3.png',
+      // WHY: WebP — la palette è un gradiente morbido, in PNG pesava 822KB;
+      // in WebP scende di un ordine di grandezza, accelerando il primo paint
+      // del ribbon (il gate canvasReady dipende dal load di questa texture).
+      '/textures/ribbon3.webp',
       () => {
         // Force GPU upload so the first visible frame already has the texture.
         renderer.initTexture(texture)
+        // Freeze (reduced-motion / cattura): renderizza l'unico frame ORA, con
+        // la texture già caricata, così il poster/immagine statica è completa.
+        if (freeze) startLoop()
         mount.style.opacity = '1'
         fireCanvasReadyOnce()
       },
       undefined,
       () => {
         console.warn(
-          'HeroCanvas: palette non trovata in /public/textures/ribbon3.png'
+          'HeroCanvas: palette non trovata in /public/textures/ribbon3.webp'
         )
+        if (freeze) startLoop()
         mount.style.opacity = '1'
         fireCanvasReadyOnce()
       }
@@ -186,8 +220,8 @@ export function HeroCanvasCore({
     ribbon.scale.setScalar(c0.scale)
     scene.add(ribbon)
 
-    const wPx = Math.floor(initW * pixelRatio)
-    const hPx = Math.floor(mount.clientHeight * pixelRatio)
+    const wPx = Math.floor(initW * currentPixelRatio)
+    const hPx = Math.floor(mount.clientHeight * currentPixelRatio)
     const msaaTarget = new THREE.WebGLRenderTarget(wPx, hPx, {
       samples: quality.msaaSamples,
     })
@@ -211,6 +245,42 @@ export function HeroCanvasCore({
     )
     composer.addPass(blurPass)
 
+    // Riscalatura runtime (resize + governor): aggiorna renderer, composer,
+    // MSAA target e uniform di risoluzione a un dato pixel ratio. NON tocca la
+    // geometria. mount.clientWidth è clampato a MIN_CANVAS_W come al mount.
+    const setRenderScale = (pr: number) => {
+      const w = Math.max(mount.clientWidth, MIN_CANVAS_W)
+      const h = mount.clientHeight
+      renderer.setPixelRatio(pr)
+      renderer.setSize(w, h)
+      composer.setSize(w, h)
+      const ww = Math.floor(w * pr)
+      const hh = Math.floor(h * pr)
+      msaaTarget.setSize(ww, hh)
+      if (fxaaPass) {
+        ;(fxaaPass.uniforms['resolution'].value as THREE.Vector2).set(
+          1 / ww,
+          1 / hh
+        )
+      }
+      ;(uniforms.u_resolution.value as THREE.Vector2).set(w, h)
+      ;(blurPass.uniforms['uResolution'].value as THREE.Vector2).set(w, h)
+    }
+
+    // ── Governor adattivo ────────────────────────────────────────────────────
+    // Misura il frame time reale e degrada il FILL RATE (prima DPR, poi FXAA)
+    // se le prestazioni scendono sotto soglia. Mai la geometria: i vertici non
+    // sono il collo di bottiglia. Rete di sicurezza per i device sovrastimati
+    // dalla classificazione statica di resolveHeroCanvasQuality().
+    const PERF_WARMUP = 20 // frame iniziali ignorati (spike di caricamento)
+    const PERF_WINDOW = 60 // ampiezza finestra di misura (~1s a 60fps)
+    const PERF_MIN_FPS = 45 // sotto questa media → degrada di un livello
+    let perfLast = 0
+    let perfAccum = 0
+    let perfWindowFrames = 0
+    let perfPhaseFrames = 0
+    let degradeLevel = 0
+
     const timer = new THREE.Timer()
     timer.connect(document)
     let rafId = 0
@@ -228,10 +298,10 @@ export function HeroCanvasCore({
 
     const tick = () => {
       rafId = 0
-      if (!canRender()) return
+      if (!freeze && !canRender()) return
 
-      timer.update()
-      const t = timer.getElapsed()
+      if (!freeze) timer.update()
+      const t = freeze ? 0 : timer.getElapsed()
       const c = ctrlRef.current
 
       uniforms.u_time.value = t
@@ -297,16 +367,60 @@ export function HeroCanvasCore({
       }
 
       composer.render()
+
+      // Frame singolo (reduced-motion o cattura): non rischedulare.
+      if (freeze) return
+
+      // Governor: campiona il frame time dopo il warmup e, a finestra piena,
+      // degrada di un livello se la media è sotto soglia. Livello 1 → DPR a 1
+      // (taglia il fill rate di ~4×→1× sui display retina); livello 2 → FXAA
+      // off. Il blur resta (ha già l'early-out) per non perdere la vignetta.
+      const now = performance.now()
+      const dt = perfLast ? now - perfLast : 0
+      perfLast = now
+      if (dt > 0) {
+        perfPhaseFrames++
+        if (perfPhaseFrames > PERF_WARMUP) {
+          perfAccum += dt
+          perfWindowFrames++
+          if (perfWindowFrames >= PERF_WINDOW) {
+            const fps = (perfWindowFrames * 1000) / perfAccum
+            if (fps < PERF_MIN_FPS && degradeLevel < 2) {
+              degradeLevel++
+              if (degradeLevel === 1 && currentPixelRatio > 1) {
+                currentPixelRatio = 1
+                setRenderScale(currentPixelRatio)
+              } else if (degradeLevel === 2 && fxaaPass) {
+                fxaaPass.enabled = false
+              }
+              perfPhaseFrames = 0 // re-warmup dopo il cambio di scala
+            }
+            perfAccum = 0
+            perfWindowFrames = 0
+          }
+        }
+      }
+
       if (canRender()) rafId = requestAnimationFrame(tick)
     }
 
     const startLoop = () => {
+      if (freeze) {
+        // Reduced-motion / cattura: renderizza un solo frame, nessun loop.
+        tick()
+        return
+      }
       if (rafId || !canRender()) return
+      // Reset della finestra a ogni (ri)avvio: dopo una pausa il primo dt è
+      // enorme e falserebbe il governor.
+      perfLast = 0
+      perfPhaseFrames = 0
       rafId = requestAnimationFrame(tick)
     }
 
     const io = new IntersectionObserver(
       (entries) => {
+        if (freeze) return // frame statico: niente start/stop legati allo scroll
         const e = entries[0]
         heroIntersecting = !!e?.isIntersecting
         if (canRender()) startLoop()
@@ -317,12 +431,15 @@ export function HeroCanvasCore({
     io.observe(mount)
 
     const onVisibility = () => {
+      if (freeze) return
       if (canRender()) startLoop()
       else stopLoop()
     }
     document.addEventListener('visibilitychange', onVisibility)
 
-    startLoop()
+    // Non-freeze: avvia il loop. Freeze: il frame singolo parte al load della
+    // texture (vedi onload), così cattura/poster includono già la palette.
+    if (!freeze) startLoop()
 
     // Stop the animation loop while the window is being resized to avoid
     // rAF violations caused by the browser's GPU compositor stalling WebGL
@@ -331,34 +448,17 @@ export function HeroCanvasCore({
     const executeResize = () => {
       resizeDebounceId = null
       // WHY: stopLoop() garantisce che nessun tick() sia in volo mentre
-      // aggiorgiamo camera.aspect, renderer size e composer size.
-      // Il RAF era già fermato da onResize, ma onVisibility potrebbe averlo
-      // riavviato durante il debounce window di 150ms.
+      // aggiorniamo camera.aspect e le dimensioni di render.
       stopLoop()
-      // WHY: stessa costante MIN_CANVAS_W usata al mount — il canvas non
-      // scende mai sotto 768px. mount.clientWidth = viewport_width perché
-      // il mount div è width:100% senza min-width CSS (vedi return JSX).
-      // camera.aspect qui sotto è ciò che fa scalare la scena desktop sui
-      // viewport più piccoli, senza preset per-device.
-      const w = Math.max(mount.clientWidth, MIN_CANVAS_W),
-        h = mount.clientHeight
+      // WHY: MIN_CANVAS_W — il canvas non scende mai sotto 768px; camera.aspect
+      // è ciò che scala la scena desktop sui viewport più stretti, senza preset.
+      const w = Math.max(mount.clientWidth, MIN_CANVAS_W)
+      const h = mount.clientHeight
       camera.aspect = w / h
       camera.updateProjectionMatrix()
-      const pr = Math.min(window.devicePixelRatio, quality.pixelRatioCap)
-      renderer.setPixelRatio(pr)
-      renderer.setSize(w, h)
-      composer.setSize(w, h)
-      const ww = Math.floor(w * pr)
-      const hh = Math.floor(h * pr)
-      msaaTarget.setSize(ww, hh)
-      if (fxaaPass) {
-        ;(fxaaPass.uniforms['resolution'].value as THREE.Vector2).set(
-          1 / ww,
-          1 / hh
-        )
-      }
-      ;(uniforms.u_resolution.value as THREE.Vector2).set(w, h)
-      ;(blurPass.uniforms['uResolution'].value as THREE.Vector2).set(w, h)
+      // WHY: mantiene currentPixelRatio — se il governor l'ha già abbassato a 1,
+      // una rotazione/resize non deve riportarlo su.
+      setRenderScale(currentPixelRatio)
       startLoop()
     }
     const onResize = () => {
@@ -396,17 +496,19 @@ export function HeroCanvasCore({
       ref={mountRef}
       style={{
         position: 'absolute',
-        // WHY: usa la CSS custom property --hero-nav-h (definita in globals.css
-        // con media query) — il valore è corretto fin dal primo render SSR,
-        // senza flash post-hydration. 76px desktop, 64px mobile/tablet (≤ 1024px).
-        inset: 'calc(-1 * var(--hero-nav-h)) 0 0 0',
+        // WHY: top/right/bottom/left definiscono i quattro bordi del mount div.
+        // top negativo crea il bleed dietro la navbar (il canvas parte da sopra
+        // la section). Senza height esplicito, CSS stretch risolve correttamente:
+        // altezza = parent_height + hero-nav-h → copre tutta la section PIÙ
+        // la fascia navbar. height:100% era over-constrained (top+height+bottom
+        // tutti non-auto → CSS ignorava bottom → canvas 64/76px corto in fondo).
+        // In cattura inset:0 — il canvas coincide col box del poster, così
+        // canvas.toBlob() esporta esattamente le dimensioni del poster.
+        inset: captureMode ? '0' : 'calc(-1 * var(--hero-nav-h)) 0 0 0',
         width: '100%',
-        height: '100%',
         // WHY: overflow:hidden clippa il canvas (renderizzato a min 768px)
         // quando il viewport è più stretto, senza espandere il document width
-        // né causare browser auto-zoom. Il bleed dietro la navbar è preservato
-        // perché il clip avviene sui bordi del mount div, che già estende
-        // sopra la section dell'altezza corretta della navbar.
+        // né causare browser auto-zoom.
         overflow: 'hidden',
       }}
     />

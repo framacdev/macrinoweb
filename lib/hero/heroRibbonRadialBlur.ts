@@ -28,6 +28,18 @@ export const heroRibbonRadialBlurShader = {
       float maskLeft   = 1.0 - smoothstep(0.0, uVignetteLeft,   vUv.x);
       float maskBottom = 1.0 - smoothstep(0.0, uVignetteBottom, vUv.y);
       float blurMask = maskLeft + maskBottom - maskLeft * maskBottom;
+
+      // WHY: la maschera è ~0 sulla maggior parte dello schermo (solo i bordi
+      // sinistro e bottom sono sfocati). Lì il blur a 9 tap farebbe 9 fetch
+      // identiche poi scartate dal mix finale: early-out a una sola fetch. Il
+      // branch è spazialmente coerente (regione contigua), quindi economico
+      // anche sulle GPU mobile a tile. Risparmia 8 texture fetch sulla maggior
+      // parte dei pixel, su ogni dispositivo.
+      if (blurMask <= 0.001) {
+        gl_FragColor = texture2D(tDiffuse, vUv);
+        return;
+      }
+
       float radius   = blurMask * uBlurStr;
 
       vec2 texel = 1.0 / uResolution;

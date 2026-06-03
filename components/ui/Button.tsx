@@ -48,9 +48,9 @@ export default function Button({
     padding: '10px 28px',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: '1rem',
+    fontSize: 'clamp(1rem, 2.5vw, 1.111rem)',
     fontWeight: 600,
-    fontFamily: 'var(--font-inter)',
+    fontFamily: 'var(--font-body)',
     letterSpacing: '0.02em',
     textDecoration: 'none',
   }
@@ -61,7 +61,7 @@ export default function Button({
   if (variant === 'primary') {
     // Aspetto del primary da single source (primaryButtonStyle). Qui WITH alone
     // (A): il bottone hero poggia direttamente sul ribbon three.js.
-    arrowColor = primaryButtonForeground(isDark)
+    arrowColor = primaryButtonForeground()
     style = {
       ...baseStyle,
       ...primaryButtonStyle({ isDark, isHovered, withHalo: true }),
@@ -72,28 +72,29 @@ export default function Button({
     // in ogni stato e permette transizioni cromatiche precise.
     style = {
       ...baseStyle,
-      // Usa color-mix per applicare il 50% di opacità a una variabile HEX
-      backgroundColor: 'color-mix(in srgb, var(--color-bg) 50%, transparent)',
+      // WHY: 80% (era 50%) — contrasto ghost sul ribbon: testo #1A5BB8 su
+      // vetro 80% porta il rapporto a ~5.7:1, sopra la soglia WCAG 4.5:1
+      // anche dove il ribbon è più saturo. Il vetro resta visibile.
+      backgroundColor: 'color-mix(in srgb, var(--color-bg) 80%, transparent)',
 
-      // Aggiungi il filtro blur
       backdropFilter: 'blur(8px)',
-      WebkitBackdropFilter: 'blur(8px)', // Fondamentale per Safari
+      WebkitBackdropFilter: 'blur(8px)',
 
       color: isDark
         ? isHovered
-          ? '#2a9ae8'
+          ? C.accentHover
           : C.accent
         : isHovered
-          ? '#1A5BB8'
+          ? C.primaryHover
           : C.primary,
       border: `1px solid ${
         isDark
           ? isHovered
-            ? '#2a9ae8'
-            : `color-mix(in srgb, ${C.accent} 50%, transparent)`
+            ? C.accentHover
+            : `color-mix(in srgb, ${C.accent} 55%, transparent)`
           : isHovered
-            ? '#1A5BB8'
-            : `color-mix(in srgb, ${C.primary} 50%, transparent)`
+            ? C.primaryHover
+            : `color-mix(in srgb, ${C.primary} 55%, transparent)`
       }`,
       transition:
         'color 0.25s ease-in-out, border-color 0.25s ease-in-out, background-color 0.25s ease-in-out',

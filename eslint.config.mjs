@@ -12,8 +12,11 @@ const eslintConfig = defineConfig([
     'out/**',
     'build/**',
     'next-env.d.ts',
-    // Agent worktrees — non fanno parte del sorgente del progetto
+    // Tooling AI e artefatti generati — non fanno parte del sorgente del progetto
     '.claude/**',
+    '.agents/**',
+    '.impeccable/**',
+    'reports/**',
   ]),
 ])
 

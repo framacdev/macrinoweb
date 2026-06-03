@@ -4,7 +4,7 @@ import { C } from '@/lib/constants'
 /**
  * primaryButtonStyle — SINGLE SOURCE OF TRUTH dell'aspetto del primary action.
  *
- * Condiviso dal bottone hero "Iniziamo" (components/ui/Button.tsx) e dalla CTA
+ * Condiviso dal bottone hero "Parliamone" (components/ui/Button.tsx) e dalla CTA
  * header "Contattami" (components/layout/Header.tsx), così restano identici in
  * entrambi i temi senza duplicare la logica (DRY / SRP). L'unica differenza è
  * l'alone (`withHalo`), che si applica solo dove il bottone poggia direttamente
@@ -22,10 +22,14 @@ import { C } from '@/lib/constants'
  * impone geometrie).
  */
 
-// Foreground condiviso (testo + freccia): navy su accent chiaro in dark,
-// bg chiaro su primary in light. Esposto a parte così la freccia SVG combacia.
-export function primaryButtonForeground(isDark: boolean): string {
-  return isDark ? C.bgDark : C.bg
+// WHY: CSS var invece di valore JS-computato via isDark. next-themes applica .dark
+// a <html> PRIMA dell'hydration di React (inline script), quindi la var è già
+// corretta al primo paint. Il valore JS richiederebbe mounted=true (un rAF) → un
+// frame di flash dove il bottone mostra i colori light anche in dark mode.
+// La freccia SVG usa style={{ stroke: color }} (non attributo SVG) così la
+// custom property si risolve correttamente anche nel canvas SVG.
+export function primaryButtonForeground(): string {
+  return 'var(--btn-primary-fg)'
 }
 
 export function primaryButtonStyle({
@@ -37,32 +41,30 @@ export function primaryButtonStyle({
   isHovered: boolean
   withHalo: boolean
 }): CSSProperties {
-  // Fill brand, theme-aware. Dark usa accent (#3da9fc): primary (#2273D4) si
-  // fonderebbe col ribbon, mentre accent dà alto contrasto interno col testo navy.
-  const fill = isDark
-    ? isHovered
+  // WHY: fill CSS var in stato default (non-hover) — nessun flash al refresh.
+  // In hover usa il valore JS: l'hover avviene solo dopo interazione utente,
+  // mai al primo render, quindi non causa flash.
+  const fill = isHovered
+    ? isDark
       ? C.accentHover
-      : C.accent
-    : isHovered
-      ? C.primaryHover
-      : C.primary
+      : C.primaryHover
+    : 'var(--btn-primary-bg)'
 
   // C — profondità: volutamente leggera, il minimo per staccare dal ribbon.
   const depth = isDark
     ? '0 3px 8px rgba(0,0,0,0.18)'
     : '0 3px 8px rgba(9,32,55,0.08)'
 
-  // A — alone morbido al 50% in var(--color-bg) (via color-mix): theme-adaptive,
-  // appena accennato, solo dove serve (hero).
+  // A — alone morbido in var(--color-bg): theme-adaptive, solo dove serve (hero).
   const halo =
-    '0 0 6px 1px color-mix(in srgb, var(--color-bg) 15%, transparent)'
+    '0 0 6px 1px color-mix(in srgb, var(--color-bg) 30%, transparent)'
 
   return {
     backgroundColor: fill,
     // D — backgroundImage (non shorthand) per non confliggere con backgroundColor.
     backgroundImage:
       'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 48%, rgba(0,0,0,0.10) 100%)',
-    color: primaryButtonForeground(isDark),
+    color: 'var(--btn-primary-fg)',
     boxShadow: withHalo ? `${halo}, ${depth}` : depth,
     transition:
       'background-color 0.25s ease-in-out, box-shadow 0.25s ease-in-out',
