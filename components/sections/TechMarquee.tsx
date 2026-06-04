@@ -40,6 +40,8 @@ import Bootstrap from '@/assets/logos/bootstrap.svg'
 import Wordpress from '@/assets/logos/wordpress.svg'
 import Woocommerce from '@/assets/logos/woocommerce.svg'
 import Flutter from '@/assets/logos/flutter.svg'
+import GithubLight from '@/assets/logos/github-light.svg'
+import GithubDark from '@/assets/logos/github-dark.svg'
 import Vscode from '@/assets/logos/vscode.svg'
 import CursorLight from '@/assets/logos/cursor-light.svg'
 import CursorDark from '@/assets/logos/cursor-dark.svg'
@@ -57,6 +59,7 @@ type SvgComp = ComponentType<SVGProps<SVGSVGElement>>
 // via .dark (stesso pattern Sole/Luna dell'header, zero hydration mismatch):
 //  • Next.js: cerchio nero invisibile sul navy → variante a disco bianco.
 //  • Cursor: due varianti ufficiali chiare/scure.
+//  • GitHub: mark nero invisibile sul navy → variante chiara (#f1f6ff) per il dark.
 //  • Illustrator: tile #330000 cupo sul navy → variante invertita (tile arancione).
 // `label` è single source: alimenta aria-label, data-label (delegation) e tooltip.
 type Logo =
@@ -79,6 +82,7 @@ const LOGOS: readonly Logo[] = [
   { label: 'WordPress 6.8', Comp: Wordpress },
   { label: 'WooCommerce 10', Comp: Woocommerce },
   { label: 'Flutter 3.44', Comp: Flutter },
+  { label: 'GitHub', Light: GithubLight, Dark: GithubDark },
   { label: 'Visual Studio Code', Comp: Vscode },
   { label: 'Cursor', Light: CursorLight, Dark: CursorDark },
   { label: 'Figma', Comp: Figma },
