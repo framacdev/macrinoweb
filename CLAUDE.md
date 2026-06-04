@@ -45,7 +45,6 @@ Progetto pubblico — puoi usare Claude Code, Cline o qualsiasi AI tool.
 - SEO: app/robots.ts + app/sitemap.ts (route metadata), JSON-LD Person e
   metadati OG in app/layout.tsx; stringhe del sito in lib/site.ts (single source)
 - Script custom:
-  - scripts/optimize-ribbon-texture.mjs (assets/textures/ribbon3.png → public .webp)
   - scripts/generate-og-image.mjs (compone public/og-image.png 1200×630 dal poster)
 - Cattura poster ribbon: route dev /ribbon-capture (frame congelato, PNG+WebP)
 

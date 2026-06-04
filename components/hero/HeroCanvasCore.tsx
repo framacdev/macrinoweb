@@ -122,12 +122,8 @@ export function HeroCanvasCore({
     }
 
     const texture = new THREE.TextureLoader().load(
-      // WHY: WebP — la palette è un gradiente morbido, in PNG pesava 822KB;
-      // in WebP scende di un ordine di grandezza, accelerando il primo paint
-      // del ribbon (il gate canvasReady dipende dal load di questa texture).
-      '/textures/ribbon3.webp',
+      '/textures/ribbon3.png',
       () => {
-        // Force GPU upload so the first visible frame already has the texture.
         renderer.initTexture(texture)
         // Freeze (reduced-motion / cattura): renderizza l'unico frame ORA, con
         // la texture già caricata, così il poster/immagine statica è completa.
@@ -138,7 +134,7 @@ export function HeroCanvasCore({
       undefined,
       () => {
         console.warn(
-          'HeroCanvas: palette non trovata in /public/textures/ribbon3.webp'
+          'HeroCanvas: palette non trovata in /public/textures/ribbon3.png'
         )
         if (freeze) startLoop()
         mount.style.opacity = '1'

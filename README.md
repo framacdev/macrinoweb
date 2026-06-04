@@ -27,7 +27,6 @@ npm run lint       # eslint
 ## Script
 
 ```bash
-npm run hero:texture                    # assets/textures/ribbon3.png → public .webp
 node scripts/generate-og-image.mjs      # rigenera public/og-image.png (1200×630)
 ```
 
