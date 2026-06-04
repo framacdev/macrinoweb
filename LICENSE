@@ -29,6 +29,21 @@ concepts) are additionally protected under Creative Commons
 Attribution-NonCommercial-NoDerivatives 4.0 International.
 https://creativecommons.org/licenses/by-nc-nd/4.0/
 
+THIRD-PARTY AND DERIVED COMPONENTS:
+The hero ribbon WebGL shader (lib/hero/) is a reimplementation
+derived from Stripe's WebGL ribbon (https://stripe.com) and
+incorporates third-party shader code under its own terms:
+- 2D simplex noise — Stefan Gustavson / Inigo Quilez
+  (Shadertoy 43tBDr)
+- shaping functions expStep, parabola, mapLinear — Inigo Quilez,
+  MIT (https://iquilezles.org/articles/functions/)
+- hueShift — godotshaders.com, CC0
+These derived and third-party portions are NOT owned by the
+author and are NOT covered by the portfolio terms above; they
+remain under their respective original licenses and authorship.
+The terms of this license apply only to the author's own
+original code, design, and content.
+
 This source code is provided "as is", without warranty
 of any kind, express or implied.
 

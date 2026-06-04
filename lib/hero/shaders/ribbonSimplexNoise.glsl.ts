@@ -1,6 +1,14 @@
 /**
  * Blocco GLSL 2D simplex condiviso tra vertex e fragment.
  * Prefisso `ribbon*` sui simboli per evitare collisioni con altri chunk.
+ *
+ * Origine: 2D simplex noise di Stefan Gustavson / Inigo Quilez
+ * (Shadertoy 43tBDr — "Simplex noise demystified"). Stesse costanti K1/K2 e
+ * fattore analitico. L'hash è il classico one-liner `fract(sin(dot)*43758.5)`
+ * (folklore GLSL, nessun autore specifico): più correlato di un hash "vero",
+ * il che qui è desiderato — attenua il noise di superficie e lo mantiene morbido
+ * (un hash decorrelato lo renderebbe granuloso). Codice di terzi (simplex): vedi
+ * LICENSE › THIRD-PARTY AND DERIVED COMPONENTS.
  */
 export const ribbonSimplexNoiseGlsl = /* glsl */ `
 float ribbonHash11(vec2 p) {

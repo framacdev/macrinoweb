@@ -52,3 +52,9 @@ Vercel. Lingua del sito: italiano.
 © 2026 Francesco Macrino. All rights reserved.
 This repository is public for portfolio purposes only.
 See [LICENSE](./LICENSE) for details.
+
+L'hero ribbon è una reimplementazione, derivata e estesa, della tecnica del
+ribbon WebGL di [Stripe](https://stripe.com), e usa codice shader di terzi
+(simplex noise di Gustavson/Quilez, shaping functions di Inigo Quilez,
+hueShift CC0). Crediti completi in [LICENSE](./LICENSE) e nei sorgenti
+`lib/hero/`.

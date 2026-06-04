@@ -1,3 +1,25 @@
+/**
+ * Shader del ribbon hero.
+ *
+ * PROVENIENZA — onestà intellettuale. Questo shader è una REIMPLEMENTAZIONE
+ * DERIVATA dalla tecnica del ribbon WebGL di Stripe (https://stripe.com):
+ * la struttura del twist (le tre rotationMatrix pilotate da expStep), il
+ * displacement di base su Y, la composizione colore/noise di superficie e il
+ * glow ricavato da dFdy provengono dal loro materiale. Mie aggiunte: i due assi
+ * di displacement extra (X perpendicolare, Z), le linee di luce animate
+ * (uniform u_line2*) e il post-processing (vedi heroRibbonRadialBlur.ts).
+ * Le funzioni matematiche vengono da fonti pubbliche di terzi (vedi sotto).
+ *
+ * Crediti:
+ *  • Tecnica ribbon ........ Stripe — https://stripe.com
+ *  • simplex noise ......... Stefan Gustavson / Inigo Quilez — Shadertoy 43tBDr
+ *                            (vedi ribbonSimplexNoise.glsl.ts)
+ *  • expStep, parabola,
+ *    mapLinear ............. Inigo Quilez (MIT) — iquilezles.org/articles/functions
+ *  • hueShift .............. godotshaders.com — CC0
+ *
+ * Vedi LICENSE › THIRD-PARTY AND DERIVED COMPONENTS.
+ */
 import { ribbonSimplexNoiseGlsl } from '@/lib/hero/shaders/ribbonSimplexNoise.glsl'
 
 export const heroRibbonVertexShader = /* glsl */ `
