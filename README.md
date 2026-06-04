@@ -46,3 +46,9 @@ scripts/        ottimizzazione texture, generazione OG
 ## Deploy
 
 Vercel. Lingua del sito: italiano.
+
+## License
+
+© 2026 Francesco Macrino. All rights reserved.
+This repository is public for portfolio purposes only.
+See [LICENSE](./LICENSE) for details.
