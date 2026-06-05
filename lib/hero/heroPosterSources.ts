@@ -3,9 +3,11 @@
  * Nessuna API o scan: `<picture>` in `HeroSection` usa solo queste costanti.
  *
  * Formati per breakpoint: AVIF (primario, ~metà dei byte) → WebP (fallback per
- * Safari < 16.4) → PNG come `<img>` ultimo fallback (solo desktop). I file sono
- * pre-generati dai master PNG con sharp (qualità alta, statici → portabili su
- * qualsiasi host, niente ottimizzazione runtime).
+ * Safari < 16.4). L'`<img>` finale usa il WebP desktop; se anche quello fallisce
+ * (browser preistorico) onError nasconde il poster. File serviti pre-generati
+ * dai master PNG con sharp: statici → portabili su qualsiasi host, niente
+ * ottimizzazione runtime. Master sorgente in `assets/hero-posters/` (NON
+ * deployati); rigenera i serviti con `npm run posters`.
  *
  * Breakpoint applicati in HeroSection (prima corrispondenza vince):
  *   landscape & ≤ 1024px                       → landscape
@@ -38,5 +40,3 @@ export const HERO_POSTER_LGTABLET_WEBP = `${BASE}/herocanvasposter-lgtablet.webp
 // ── Desktop (> 1024px) ──────────────────────────────────────────────────────
 export const HERO_POSTER_DESKTOP_AVIF = `${BASE}/herocanvasposter-desktop.avif`
 export const HERO_POSTER_DESKTOP_WEBP = `${BASE}/herocanvasposter-desktop.webp`
-// PNG: solo come ultimo fallback `<img>` (browser senza AVIF né WebP ≈ 0%).
-export const HERO_POSTER_DESKTOP_PNG = `${BASE}/herocanvasposter-desktop.png`

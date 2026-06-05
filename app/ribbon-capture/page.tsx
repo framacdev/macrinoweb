@@ -12,8 +12,9 @@
  * precisione float diversi, e il poster non combacerebbe col canvas live al
  * crossfade. toBlob esporta nativamente sia PNG che WebP, senza dipendenze.
  *
- * Uso: apri /ribbon-capture, seleziona un preset, attendi il render, scarica.
- * Sostituisci i file in public/ribbon-fallback/ con quelli scaricati.
+ * Uso: apri /ribbon-capture, seleziona un preset, attendi il render, scarica il
+ * PNG (è il master). Mettilo in assets/hero-posters/ e lancia `npm run posters`
+ * per rigenerare i poster serviti (AVIF + WebP) in public/ribbon-fallback/.
  * Dev-only: in produzione la pagina non mostra lo strumento.
  */
 
@@ -25,7 +26,12 @@ import { cloneHeroRibbonDefaults } from '@/lib/hero/heroControlDefaults'
 // Dimensioni allineate ai poster esistenti in public/ribbon-fallback/.
 const PRESETS = [
   { key: 'landscape', label: 'Mobile landscape (≤ 1024px)', w: 2048, h: 1366 },
-  { key: 'sportrait', label: 'Small phone portrait (< 576px)', w: 1150, h: 1536 },
+  {
+    key: 'sportrait',
+    label: 'Small phone portrait (< 576px)',
+    w: 1150,
+    h: 1536,
+  },
   { key: 'tablet', label: 'Large phone portrait (< 768px)', w: 1536, h: 1536 },
   { key: 'lgtablet', label: 'Tablet / laptop (768–1024px)', w: 2048, h: 1536 },
   { key: 'desktop', label: 'Desktop (> 1024px)', w: 2538, h: 1398 },

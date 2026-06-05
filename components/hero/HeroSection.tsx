@@ -9,7 +9,6 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   HERO_POSTER_DESKTOP_AVIF,
-  HERO_POSTER_DESKTOP_PNG,
   HERO_POSTER_DESKTOP_WEBP,
   HERO_POSTER_LANDSCAPE_AVIF,
   HERO_POSTER_LANDSCAPE_WEBP,
@@ -145,11 +144,13 @@ export default function HeroSection() {
             srcSet={HERO_POSTER_LGTABLET_WEBP}
           />
 
-          {/* ── > 1024px — desktop (PNG via <img> = ultimo fallback) ───────── */}
+          {/* ── > 1024px — desktop. L'<img> (src = WebP) è anche l'elemento
+              renderizzato; le <source> sopra lo sovrascrivono nei browser con
+              <picture>. onError nasconde il poster se anche il WebP fallisce. */}
           <source type="image/avif" srcSet={HERO_POSTER_DESKTOP_AVIF} />
           <source type="image/webp" srcSet={HERO_POSTER_DESKTOP_WEBP} />
           <img
-            src={HERO_POSTER_DESKTOP_PNG}
+            src={HERO_POSTER_DESKTOP_WEBP}
             alt=""
             width={1920}
             height={1080}

@@ -6,7 +6,8 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "posters": "node scripts/optimize-hero-posters.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
