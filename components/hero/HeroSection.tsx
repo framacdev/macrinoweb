@@ -8,15 +8,16 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
+  HERO_POSTER_DESKTOP_AVIF,
   HERO_POSTER_DESKTOP_PNG,
   HERO_POSTER_DESKTOP_WEBP,
-  HERO_POSTER_LANDSCAPE_PNG,
+  HERO_POSTER_LANDSCAPE_AVIF,
   HERO_POSTER_LANDSCAPE_WEBP,
-  HERO_POSTER_LGTABLET_PNG,
+  HERO_POSTER_LGTABLET_AVIF,
   HERO_POSTER_LGTABLET_WEBP,
-  HERO_POSTER_SPORTRAIT_PNG,
+  HERO_POSTER_SPORTRAIT_AVIF,
   HERO_POSTER_SPORTRAIT_WEBP,
-  HERO_POSTER_TABLET_PNG,
+  HERO_POSTER_TABLET_AVIF,
   HERO_POSTER_TABLET_WEBP,
 } from '@/lib/hero/heroPosterSources'
 import { hasWebGL } from '@/lib/hero/hasWebGL'
@@ -92,55 +93,60 @@ export default function HeroSection() {
             transition: 'opacity 0.55s ease',
           }}
         >
+          {/* WHY ordine: per ogni breakpoint AVIF prima di WebP → il browser
+              prende AVIF se supportato (Safari 16.4+, tutti gli altri moderni),
+              altrimenti WebP. Il PNG resta solo come <img> finale. */}
+
           {/* ── landscape mobile (≤1024px) — poster dedicato, aspect largo ── */}
+          <source
+            type="image/avif"
+            media={LANDSCAPE_MEDIA}
+            srcSet={HERO_POSTER_LANDSCAPE_AVIF}
+          />
           <source
             type="image/webp"
             media={LANDSCAPE_MEDIA}
             srcSet={HERO_POSTER_LANDSCAPE_WEBP}
           />
-          <source
-            type="image/png"
-            media={LANDSCAPE_MEDIA}
-            srcSet={HERO_POSTER_LANDSCAPE_PNG}
-          />
 
           {/* ── < 576px — phone portrait piccolo ─────────────────────────── */}
+          <source
+            type="image/avif"
+            media="(max-width: 575px)"
+            srcSet={HERO_POSTER_SPORTRAIT_AVIF}
+          />
           <source
             type="image/webp"
             media="(max-width: 575px)"
             srcSet={HERO_POSTER_SPORTRAIT_WEBP}
           />
-          <source
-            type="image/png"
-            media="(max-width: 575px)"
-            srcSet={HERO_POSTER_SPORTRAIT_PNG}
-          />
 
           {/* ── < 768px — phone portrait medio ─────────────────────────── */}
+          <source
+            type="image/avif"
+            media={TABLET_MEDIA}
+            srcSet={HERO_POSTER_TABLET_AVIF}
+          />
           <source
             type="image/webp"
             media={TABLET_MEDIA}
             srcSet={HERO_POSTER_TABLET_WEBP}
           />
-          <source
-            type="image/png"
-            media={TABLET_MEDIA}
-            srcSet={HERO_POSTER_TABLET_PNG}
-          />
 
           {/* ── 768px – 1024px — tablet / laptop compatto ────────────────── */}
+          <source
+            type="image/avif"
+            media="(max-width: 1024px)"
+            srcSet={HERO_POSTER_LGTABLET_AVIF}
+          />
           <source
             type="image/webp"
             media="(max-width: 1024px)"
             srcSet={HERO_POSTER_LGTABLET_WEBP}
           />
-          <source
-            type="image/png"
-            media="(max-width: 1024px)"
-            srcSet={HERO_POSTER_LGTABLET_PNG}
-          />
 
-          {/* ── > 1024px — desktop (PNG via <img> fallback per browser vecchi) ─ */}
+          {/* ── > 1024px — desktop (PNG via <img> = ultimo fallback) ───────── */}
+          <source type="image/avif" srcSet={HERO_POSTER_DESKTOP_AVIF} />
           <source type="image/webp" srcSet={HERO_POSTER_DESKTOP_WEBP} />
           <img
             src={HERO_POSTER_DESKTOP_PNG}
