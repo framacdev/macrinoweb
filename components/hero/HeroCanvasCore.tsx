@@ -95,9 +95,10 @@ export function HeroCanvasCore({
       // leggere il frame. In produzione resta false (nessun costo di memoria).
       preserveDrawingBuffer: captureMode,
     })
-    // currentPixelRatio è mutabile: il governor adattivo (vedi tick) può
-    // abbassarlo a 1 se il frame time reale supera la soglia.
-    let currentPixelRatio = Math.min(
+    // pixelRatio fisso (cap dal tier qualità). WHY: il governor NON lo abbassa
+    // più a runtime — a risoluzione dimezzata il glow dFdy aliasa (strobo, vedi
+    // tick). Resta costante per tutta la vita della scena (anche sui resize).
+    const currentPixelRatio = Math.min(
       window.devicePixelRatio,
       quality.pixelRatioCap
     )
@@ -281,6 +282,10 @@ export function HeroCanvasCore({
     timer.connect(document)
     let rafId = 0
     let heroIntersecting = true
+    // Tempo d'animazione accumulato con passo per-frame clampato (vedi tick).
+    // Robusto a rAF irregolare (DevTools aperti, throttling, device lenti):
+    // evita i salti di u_time che fanno strobare le linee di luce sottili.
+    let animTime = 0
 
     const canRender = () =>
       document.visibilityState === 'visible' && heroIntersecting
@@ -296,8 +301,16 @@ export function HeroCanvasCore({
       rafId = 0
       if (!freeze && !canRender()) return
 
-      if (!freeze) timer.update()
-      const t = freeze ? 0 : timer.getElapsed()
+      if (!freeze) {
+        timer.update()
+        // WHY: clamp del passo a 1/30s. Con rAF a raffica/stalli (DevTools aperti,
+        // throttling, device lenti, ripresa dopo resize) il delta reale può fare
+        // salti enormi → u_time salterebbe e le linee di luce strobano. Col tetto
+        // l'animazione rallenta in modo fluido invece di saltare. Gli shader usano
+        // u_time solo come fase: conta l'avanzamento regolare, non il valore assoluto.
+        animTime += Math.min(timer.getDelta(), 1 / 30)
+      }
+      const t = freeze ? 0 : animTime
       const c = ctrlRef.current
 
       uniforms.u_time.value = t
@@ -368,9 +381,13 @@ export function HeroCanvasCore({
       if (freeze) return
 
       // Governor: campiona il frame time dopo il warmup e, a finestra piena,
-      // degrada di un livello se la media è sotto soglia. Livello 1 → DPR a 1
-      // (taglia il fill rate di ~4×→1× sui display retina); livello 2 → FXAA
-      // off. Il blur resta (ha già l'early-out) per non perdere la vignetta.
+      // degrada se la media è sotto soglia → spegne FXAA.
+      // WHY: NON abbassa più il pixelRatio. A risoluzione dimezzata la derivata
+      // dFdy del glow (heroRibbonShaders) diventa rumorosa e aliasa NEL TEMPO →
+      // strobo del glow sotto carico / con i DevTools aperti. FXAA è
+      // post-process, non tocca la risoluzione del derivative → leva sicura.
+      // Il blur resta (ha già l'early-out) per non perdere la vignetta. La
+      // protezione perf di base resta nei tier iniziali (segmenti/MSAA/cap DPR).
       const now = performance.now()
       const dt = perfLast ? now - perfLast : 0
       perfLast = now
@@ -381,15 +398,10 @@ export function HeroCanvasCore({
           perfWindowFrames++
           if (perfWindowFrames >= PERF_WINDOW) {
             const fps = (perfWindowFrames * 1000) / perfAccum
-            if (fps < PERF_MIN_FPS && degradeLevel < 2) {
+            if (fps < PERF_MIN_FPS && degradeLevel < 1) {
               degradeLevel++
-              if (degradeLevel === 1 && currentPixelRatio > 1) {
-                currentPixelRatio = 1
-                setRenderScale(currentPixelRatio)
-              } else if (degradeLevel === 2 && fxaaPass) {
-                fxaaPass.enabled = false
-              }
-              perfPhaseFrames = 0 // re-warmup dopo il cambio di scala
+              if (fxaaPass) fxaaPass.enabled = false
+              perfPhaseFrames = 0 // re-warmup dopo lo spegnimento di FXAA
             }
             perfAccum = 0
             perfWindowFrames = 0
