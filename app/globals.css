@@ -190,7 +190,277 @@ html {
     --header-card-radius: 6px;
     --header-card-blur: blur(12px);
     --header-card-pl: 8px;
-    --header-card-shadow: 0 15px 35px rgba(34, 115, 212, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07);
+    --header-card-shadow:
+      0 15px 35px rgba(34, 115, 212, 0.1), 0 5px 15px rgba(0, 0, 0, 0.07);
+  }
+}
+
+/* ── Depth: sfondo unico "discesa in profondità" (post-hero) ─────────────────── */
+/* WHY: tutte le sezioni DOPO la hero sono trasparenti e condividono UN SOLO sfondo
+   a gradiente verticale (superficie → abisso). Il gradiente vive sul wrapper .depth
+   e si "stira" sull'altezza complessiva dei figli: scrollando si attraversano gli
+   stop, ottenendo la sensazione di scendere. Pensato per ~5 sezioni; con poche
+   sezioni il gradiente è più compresso (vedi nota in page.tsx). Light: i 5 stop
+   forniti (acqua chiara → abisso). Dark: siamo GIÀ in profondità → fondo navy pieno
+   + luci soffuse/caustiche (vedi ::before/::after), niente particellari. */
+.depth {
+  position: relative;
+  /* contesto di stacking proprio: i layer di luce (z<0) restano dietro al contenuto
+     in-flow (z-auto) ma sopra il fondo, senza propagarsi al resto della pagina. */
+  isolation: isolate;
+  /* WHY: i layer di luce in dark (::before/::after) animano translate/scale che
+     sforano i bordi → ritagliarli qui evita l'overflow orizzontale indesiderato.
+     `clip` (non `hidden`) non crea uno scroll container: l'altezza resta definita
+     dai figli in-flow e nessuno scroll-anchoring/sticky futuro viene compromesso. */
+  overflow: clip;
+  background-image: linear-gradient(
+    to bottom,
+    #fffffe 9%,
+    #3da9fc 43%,
+    #2273d4 63%,
+    #1a5bb8 75%,
+    #0f1e2d 100%
+  );
+}
+
+.dark .depth {
+  /* in dark non c'è discesa cromatica: siamo già nell'abisso, fondo navy pieno */
+  background-image: none;
+  background-color: #0f1e2d;
+}
+
+/* Fasci di luce + caustiche: SOLO in dark (in light il gradiente da solo basta).
+   Layer assoluti a piena altezza, dietro al contenuto (z-index:-1 nel contesto
+   isolato della .depth), non interattivi. */
+.dark .depth::before,
+.dark .depth::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ::before — fasci crepuscolari: strisce diagonali soffuse che entrano dall'alto
+   (vicino alla "superficie") e si dissolvono scendendo (mask verticale). */
+.dark .depth::before {
+  background-image:
+    linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(120, 190, 255, 0.06) 43%,
+      transparent 54%
+    ),
+    linear-gradient(
+      94deg,
+      transparent 56%,
+      rgba(120, 190, 255, 0.045) 67%,
+      transparent 76%
+    );
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 60%);
+  animation: depth-beams 19s ease-in-out infinite alternate;
+}
+
+/* ::after — caustiche: chiazze di luce sfocate che ondeggiano lente, come riflessi
+   filtrati dalla superficie. translate/scale = solo composite GPU. */
+.dark .depth::after {
+  background-image:
+    radial-gradient(
+      42% 30% at 24% 16%,
+      rgba(90, 170, 255, 0.08),
+      transparent 70%
+    ),
+    radial-gradient(
+      36% 26% at 73% 28%,
+      rgba(130, 205, 255, 0.055),
+      transparent 70%
+    );
+  filter: blur(10px);
+  animation: depth-caustics 27s ease-in-out infinite alternate;
+}
+
+@keyframes depth-beams {
+  from {
+    transform: translateX(-4%) skewX(-2deg);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateX(4%) skewX(2deg);
+    opacity: 1;
+  }
+}
+
+@keyframes depth-caustics {
+  from {
+    transform: translate(-2%, 0) scale(1.04);
+  }
+  to {
+    transform: translate(3%, 1.6%) scale(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* niente movimento delle correnti: i layer restano fissi (luce immobile) */
+  .dark .depth::before,
+  .dark .depth::after {
+    animation: none;
+  }
+}
+
+/* ── Section shell: container condiviso da tutte le sezioni ──────────────────── */
+/* WHY: stessa "linea di contenuto" della hero (max-width + padding orizzontale dai
+   token --container-max / --container-pad-x). Garantisce che i testi di ogni sezione
+   siano allineati sulla stessa colonna verticale del copy hero e del marquee. */
+.section-shell {
+  width: 100%;
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-pad-x);
+}
+
+/* ── TiltCard: superficie a vetro condivisa da tutte le card ─────────────────── */
+/* WHY: primitivo riusabile (FeaturedProject ora, card portfolio domani). Vetro +
+   colori del glow vivono qui — non in JS — così cambiano tema prima dell'hydration
+   (niente flash) e restano un'unica sorgente. Il tilt e la posizione del puntatore
+   arrivano da TiltCard.tsx via le custom property --rx/--ry e --mx/--my. */
+.tilt-card {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  /* vetro coerente col badge hero: riflesso speculare in alto-sx + convessità */
+  border: 1px solid rgba(34, 115, 212, 0.22);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  background-image:
+    radial-gradient(
+      120% 90% at 12% -10%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(255, 255, 255, 0) 48%
+    ),
+    linear-gradient(
+      160deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(224, 238, 255, 0.58) 100%
+    );
+  box-shadow:
+    0 24px 60px rgba(9, 64, 103, 0.18),
+    inset 0 1px 0.5px rgba(255, 255, 255, 1);
+  /* tilt: self-perspective pilotata dal cursore; transizione breve = inseguimento
+     morbido in entrata e ritorno in piano all'uscita (--rx/--ry → 0) */
+  transform: perspective(900px) rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg));
+  /* stato a riposo = ritorno in piano: transizione lunga e morbida (decelerazione
+     dolce). All'uscita del mouse questa torna in vigore → la card si raddrizza
+     "accompagnata", non di scatto. Durante l'hover vince la regola [data-active]. */
+  transition:
+    transform 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s ease;
+  will-change: transform;
+  /* light: il bordo illuminato è il gradiente blu della palette */
+  --glow-1: rgba(61, 169, 252, 0.95);
+  --glow-2: rgba(34, 115, 212, 0.7);
+}
+
+.dark .tilt-card {
+  border-color: rgba(120, 180, 255, 0.2);
+  background-image:
+    radial-gradient(
+      120% 90% at 12% -10%,
+      rgba(150, 195, 255, 0.18) 0%,
+      rgba(150, 195, 255, 0) 45%
+    ),
+    linear-gradient(
+      160deg,
+      rgba(56, 92, 140, 0.42) 0%,
+      rgba(16, 32, 57, 0.34) 100%
+    );
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.1);
+  /* dark: bordo "lucido" bianco-ciano, coerente con luci di profondità/caustiche */
+  --glow-1: rgba(214, 236, 255, 0.95);
+  --glow-2: rgba(61, 200, 255, 0.55);
+}
+
+/* bordo illuminato: solo l'anello di 1px (mask-composite) si accende dove passa il
+   cursore. radial-gradient ancorato a --mx/--my; opacità 0 a riposo, 1 quando il
+   mouse è sopra (data-active impostato da TiltCard, solo per mouse). */
+.tilt-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1px;
+  background: radial-gradient(
+    220px circle at var(--mx, 50%) var(--my, 50%),
+    var(--glow-1),
+    var(--glow-2) 38%,
+    transparent 70%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.tilt-card[data-active]::before {
+  opacity: 1;
+}
+.tilt-card[data-active] {
+  /* mouse sopra: inseguimento reattivo e corto (segue il cursore senza lag) */
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.4s ease;
+  box-shadow:
+    0 30px 70px rgba(9, 64, 103, 0.22),
+    inset 0 1px 0.5px rgba(255, 255, 255, 1);
+}
+.dark .tilt-card[data-active] {
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* niente tilt: la card resta in piano, il bordo illuminato resta (è luce, non moto) */
+  .tilt-card {
+    transform: none;
+    transition: box-shadow 0.3s ease;
+  }
+}
+
+/* ── Layout card "progetto in evidenza" ─────────────────────────────────────── */
+/* WHY: impila visual+testo su mobile e affianca da ≥860px (visual ~46% | testo il
+   resto). La media query non può stare inline, quindi vive qui. */
+.featured-card {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+/* divisore tra visual e testo: in basso quando impilati, a destra quando affiancati */
+.featured-card > :first-child {
+  border-bottom: 1px solid rgba(34, 115, 212, 0.1);
+}
+.dark .featured-card > :first-child {
+  border-bottom-color: rgba(120, 180, 255, 0.1);
+}
+@media (min-width: 860px) {
+  .featured-card {
+    grid-template-columns: minmax(0, 0.85fr) 1fr;
+  }
+  .featured-card > :first-child {
+    border-bottom: none;
+    border-right: 1px solid rgba(34, 115, 212, 0.1);
+  }
+  .dark .featured-card > :first-child {
+    border-right-color: rgba(120, 180, 255, 0.1);
   }
 }
 
@@ -278,7 +548,11 @@ h3 {
 h4,
 h5,
 h6 {
-  font-size: clamp(1.111rem, 2.5vw, 1.333rem); /* 20px → 24px (mobile era = body, ora gerarchia corretta) */
+  font-size: clamp(
+    1.111rem,
+    2.5vw,
+    1.333rem
+  ); /* 20px → 24px (mobile era = body, ora gerarchia corretta) */
   font-weight: 500;
 }
 
@@ -355,7 +629,7 @@ button {
   position: absolute;
   left: 0;
   right: 0;
-  height: .5px;
+  height: 0.5px;
   background-color: var(--color-header-border);
   pointer-events: none;
   transform: translateZ(0);
@@ -524,8 +798,10 @@ button {
   width: 8px;
   height: 8px;
   background: color-mix(in srgb, var(--color-bg), var(--color-text) 6%);
-  border-right: 1px solid color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
-  border-bottom: 1px solid color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
+  border-right: 1px solid
+    color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-bg), var(--color-text) 18%);
   transform: translateX(-50%) rotate(45deg);
 }
 

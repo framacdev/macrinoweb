@@ -15,6 +15,11 @@ import HeroSection from '@/components/hero/HeroSection'
 // SSR resta attivo (nessun ssr:false) → HTML presente, niente pop-in né perdita
 // SEO degli aria-label dei loghi.
 const TechMarquee = dynamic(() => import('@/components/sections/TechMarquee'))
+// Sotto la piega, client (framer-motion + theme): chunk separato, SSR attivo
+// (niente ssr:false) → HTML presente per SEO, nessun pop-in.
+const FeaturedProject = dynamic(
+  () => import('@/components/sections/FeaturedProject')
+)
 
 export default function HomePage() {
   return (
@@ -22,10 +27,17 @@ export default function HomePage() {
       <HeroSection />
       <TechMarquee />
       {/*
-       * Le sezioni successive (Servizi, Portfolio, ecc.) andranno qui.
-       * Avranno position:relative normale (non fixed/absolute come la hero),
-       * quindi si "impileranno" sotto la hero section nello scroll naturale.
+       * WHY: wrapper .depth — UN SOLO sfondo a gradiente (superficie → abisso)
+       * condiviso da tutte le sezioni post-hero, che restano trasparenti. Vedi
+       * globals.css. Il gradiente si "stira" sull'altezza dei figli: scrollando
+       * si scende in profondità. Pensato per ~5 sezioni — con poche sezioni è più
+       * compresso, si distende man mano che se ne aggiungono. In dark: fondo navy
+       * pieno + luci/caustiche. Le prossime sezioni (Servizi, Contatti, ecc.) vanno
+       * qui dentro, NON con uno sfondo proprio.
        */}
+      <div className="depth">
+        <FeaturedProject />
+      </div>
     </main>
   )
 }
